@@ -61,82 +61,40 @@ const INTIME_ZONE_3 = new Set([
 ]);
 
 const GLS_1 = [
-  { max: 1, price: 3.1 },
-  { max: 2, price: 3.1 },
-  { max: 3, price: 3.3 },
-  { max: 5, price: 4.08 },
-  { max: 10, price: 5.25 },
-  { max: 15, price: 5.93 },
-  { max: 20, price: 7.33 },
-  { max: 25, price: 7.9 },
-  { max: 30, price: 9.32 },
-  { max: 40, price: 10.52 },
+  { max: 1, price: 3.1 }, { max: 2, price: 3.1 }, { max: 3, price: 3.3 }, { max: 5, price: 4.08 },
+  { max: 10, price: 5.25 }, { max: 15, price: 5.93 }, { max: 20, price: 7.33 }, { max: 25, price: 7.9 },
+  { max: 30, price: 9.32 }, { max: 40, price: 10.52 },
 ];
 
 const GLS_2_4 = [
-  { max: 1, price: 2.34 },
-  { max: 2, price: 2.34 },
-  { max: 3, price: 2.51 },
-  { max: 5, price: 2.62 },
-  { max: 10, price: 3.32 },
-  { max: 15, price: 4.26 },
-  { max: 20, price: 4.95 },
-  { max: 25, price: 5.67 },
-  { max: 30, price: 6.99 },
-  { max: 40, price: 7.74 },
+  { max: 1, price: 2.34 }, { max: 2, price: 2.34 }, { max: 3, price: 2.51 }, { max: 5, price: 2.62 },
+  { max: 10, price: 3.32 }, { max: 15, price: 4.26 }, { max: 20, price: 4.95 }, { max: 25, price: 5.67 },
+  { max: 30, price: 6.99 }, { max: 40, price: 7.74 },
 ];
 
 const GLS_5P = [
-  { max: 1, price: 2.04 },
-  { max: 2, price: 2.04 },
-  { max: 3, price: 2.25 },
-  { max: 5, price: 2.36 },
-  { max: 10, price: 3.08 },
-  { max: 15, price: 3.96 },
-  { max: 20, price: 4.64 },
-  { max: 25, price: 5.38 },
-  { max: 30, price: 6.47 },
-  { max: 40, price: 7.54 },
+  { max: 1, price: 2.04 }, { max: 2, price: 2.04 }, { max: 3, price: 2.25 }, { max: 5, price: 2.36 },
+  { max: 10, price: 3.08 }, { max: 15, price: 3.96 }, { max: 20, price: 4.64 }, { max: 25, price: 5.38 },
+  { max: 30, price: 6.47 }, { max: 40, price: 7.54 },
 ];
 
 const DPD_TABLE = [
-  { max: 1, price: 2.59 },
-  { max: 2, price: 2.59 },
-  { max: 3, price: 2.67 },
-  { max: 5, price: 2.67 },
-  { max: 10, price: 3.25 },
-  { max: 15, price: 3.25 },
-  { max: 20, price: 4.09 },
-  { max: 25, price: 4.09 },
-  { max: 31.5, price: 5.64 },
+  { max: 1, price: 2.59 }, { max: 2, price: 2.59 }, { max: 3, price: 2.67 }, { max: 5, price: 2.67 },
+  { max: 10, price: 3.25 }, { max: 15, price: 3.25 }, { max: 20, price: 4.09 }, { max: 25, price: 4.09 }, { max: 31.5, price: 5.64 },
 ];
 
 const HP_TABLE = [
-  { max: 5, price: 2.2 },
-  { max: 10, price: 2.8 },
-  { max: 15, price: 3.3 },
-  { max: 20, price: 4.05 },
-  { max: 30, price: 5.45 },
+  { max: 5, price: 2.2 }, { max: 10, price: 2.8 }, { max: 15, price: 3.3 }, { max: 20, price: 4.05 }, { max: 30, price: 5.45 },
 ];
 
 const OS_SINGLE = [
-  { max: 10, price: 2.61 },
-  { max: 20, price: 3.24 },
-  { max: 31.5, price: 3.52 },
+  { max: 10, price: 2.61 }, { max: 20, price: 3.24 }, { max: 31.5, price: 3.52 },
 ];
 
 const OS_MULTI = [
-  { max: 5, price: 2.63 },
-  { max: 10, price: 2.84 },
-  { max: 20, price: 4.17 },
-  { max: 30, price: 5.4 },
-  { max: 40, price: 6.31 },
-  { max: 50, price: 7.81 },
-  { max: 60, price: 8.74 },
-  { max: 70, price: 10.09 },
-  { max: 80, price: 11.8 },
-  { max: 90, price: 13.21 },
-  { max: 100, price: 14.56 },
+  { max: 5, price: 2.63 }, { max: 10, price: 2.84 }, { max: 20, price: 4.17 }, { max: 30, price: 5.4 },
+  { max: 40, price: 6.31 }, { max: 50, price: 7.81 }, { max: 60, price: 8.74 }, { max: 70, price: 10.09 },
+  { max: 80, price: 11.8 }, { max: 90, price: 13.21 }, { max: 100, price: 14.56 },
 ];
 
 const INTIME_TABLE = {
@@ -213,7 +171,7 @@ function packageGirth(item: PackageItem) {
   return item.length + 2 * item.width + 2 * item.height;
 }
 
-function baseInputStyle(): React.CSSProperties {
+function inputStyle(): React.CSSProperties {
   return {
     padding: 12,
     fontSize: 16,
@@ -224,7 +182,7 @@ function baseInputStyle(): React.CSSProperties {
   };
 }
 
-function cardStyle(highlight = false): React.CSSProperties {
+function boxStyle(highlight = false): React.CSSProperties {
   return {
     border: highlight ? "2px solid #16a34a" : "1px solid #e5e7eb",
     background: highlight ? "#f0fdf4" : "#fff",
@@ -238,12 +196,8 @@ function calcHP(items: PackageItem[], cod: boolean): PriceResult {
     const p = items[i];
     const longest = Math.max(p.length, p.width, p.height);
     const sum = p.length + p.width + p.height;
-    if (longest > 60) {
-      return { name: "HP", price: null, possible: false, details: [`Paket ${i + 1}: najduža stranica > 60 cm`] };
-    }
-    if (sum > 180) {
-      return { name: "HP", price: null, possible: false, details: [`Paket ${i + 1}: zbroj stranica > 180 cm`] };
-    }
+    if (longest > 60) return { name: "HP", price: null, possible: false, details: [`Paket ${i + 1}: najduža stranica > 60 cm`] };
+    if (sum > 180) return { name: "HP", price: null, possible: false, details: [`Paket ${i + 1}: zbroj stranica > 180 cm`] };
   }
 
   const total = totalRealWeight(items);
@@ -301,9 +255,8 @@ function calcDPD(items: PackageItem[], postal: string): PriceResult {
   }
 
   let price = 0;
-  if (items.length >= 2) {
-    price = items.length * 2.89;
-  } else {
+  if (items.length >= 2) price = items.length * 2.89;
+  else {
     const base = tierPrice(DPD_TABLE, items[0].weight);
     if (base === null) return { name: "DPD", price: null, possible: false, details: ["Nema DPD cijene za ovu masu"] };
     price = base;
@@ -373,10 +326,10 @@ function calcInTime(items: PackageItem[], postal: string): PriceResult {
   const volumetric = totalVolumetricWeight(items);
   const chargeable = Math.max(real, volumetric);
   const zone = getInTimeZone(postal);
-  const base = tierPrice([...INTIME_TABLE[zone]], chargeable);
+  const base = tierPrice(INTIME_TABLE[zone], chargeable);
 
   if (base === null) {
-    return { name: "InTime", price: null, possible: false, details: ["Obračunska masa prelazi 100 kg u ovoj verziji"] };
+    return { name: "InTime", price: null, possible: false, details: ["Obračunska masa prelazi 1000 kg"] };
   }
 
   return {
@@ -388,39 +341,38 @@ function calcInTime(items: PackageItem[], postal: string): PriceResult {
 }
 
 export default function App() {
-  const [postal, setPostal] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [cod, setCod] = useState(false);
-  const [items, setItems] = useState<PackageItem[]>([
+  const [packages, setPackages] = useState<PackageItem[]>([
     { weight: 2, length: 30, width: 20, height: 10 },
   ]);
 
-  const updateItem = (index: number, field: keyof PackageItem, value: number) => {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
-  };
+  const normalized = useMemo(
+    () =>
+      packages.map((p) => ({
+        weight: Number(p.weight) || 0,
+        length: Number(p.length) || 0,
+        width: Number(p.width) || 0,
+        height: Number(p.height) || 0,
+      })),
+    [packages]
+  );
 
-  const addPackage = () => {
-    setItems((prev) => [...prev, { weight: 1, length: 20, width: 20, height: 10 }]);
-  };
-
-  const duplicatePackage = (index: number) => {
-    setItems((prev) => [...prev.slice(0, index + 1), { ...prev[index] }, ...prev.slice(index + 1)]);
-  };
-
-  const removePackage = (index: number) => {
-    setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
-  };
-
-  const ready = postal.length === 5 && items.every((p) => p.weight > 0 && p.length > 0 && p.width > 0 && p.height > 0);
+  const total = useMemo(() => totalRealWeight(normalized), [normalized]);
 
   const results = useMemo(() => {
+    const ready =
+      postalCode.length === 5 &&
+      normalized.every((p) => p.weight > 0 && p.length > 0 && p.width > 0 && p.height > 0);
+
     if (!ready) return null;
 
-    const multi = calcOSMulti(items, postal, cod);
+    const multi = calcOSMulti(normalized, postalCode, cod);
     const economy = [
-      calcDPD(items, postal),
-      calcHP(items, cod),
-      calcOSSingle(items, postal, cod),
-      calcInTime(items, postal),
+      calcDPD(normalized, postalCode),
+      calcHP(normalized, cod),
+      calcOSSingle(normalized, postalCode, cod),
+      calcInTime(normalized, postalCode),
       ...(multi ? [multi] : []),
     ].sort((a, b) => {
       if (a.possible !== b.possible) return a.possible ? -1 : 1;
@@ -430,25 +382,49 @@ export default function App() {
       return a.price - b.price;
     });
 
-    const express = calcGLS(items, postal, cod);
+    const express = calcGLS(normalized, postalCode, cod);
     const economyWinner = economy.find((x) => x.possible) || null;
 
     return { economy, express, economyWinner };
-  }, [ready, items, postal, cod]);
+  }, [postalCode, normalized, cod]);
+
+  const updatePackage = (index: number, field: keyof PackageItem, value: number) => {
+    setPackages((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+    );
+  };
+
+  const addPackage = () => {
+    setPackages((prev) => [...prev, { weight: 1, length: 20, width: 20, height: 10 }]);
+  };
+
+  const duplicatePackage = (index: number) => {
+    setPackages((prev) => [
+      ...prev.slice(0, index + 1),
+      { ...prev[index] },
+      ...prev.slice(index + 1),
+    ]);
+  };
+
+  const removePackage = (index: number) => {
+    setPackages((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
 
   return (
     <div style={{ padding: 20, fontFamily: "Arial, sans-serif", maxWidth: 980, margin: "0 auto" }}>
-      <h1 style={{ marginBottom: 8 }}>MBE kalkulator</h1>
-      <div style={{ color: "#555", marginBottom: 20 }}>Paket po paket, s dimenzijama i stvarnom logikom za economy i express.</div>
+      <h1 style={{ marginBottom: 8 }}>MBE kalkulator HR</h1>
+      <div style={{ color: "#555", marginBottom: 20 }}>
+        Paket po paket, s dimenzijama i stvarnom logikom za economy i express.
+      </div>
 
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr", marginBottom: 24 }}>
+      <div style={{ display: "grid", gap: 16, marginBottom: 24 }}>
         <div>
           <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>Poštanski broj</label>
           <input
-            value={postal}
-            onChange={(e) => setPostal(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            value={postalCode}
+            onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
             placeholder="npr. 48260"
-            style={baseInputStyle()}
+            style={inputStyle()}
           />
         </div>
 
@@ -460,22 +436,31 @@ export default function App() {
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Paketi u pošiljci</h2>
-        <button onClick={addPackage} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
+        <button
+          onClick={addPackage}
+          style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}
+        >
           Dodaj paket
         </button>
       </div>
 
       <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
-        {items.map((item, index) => (
-          <div key={index} style={cardStyle()}>
+        {packages.map((pkg, index) => (
+          <div key={index} style={boxStyle()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
               <strong>Paket {index + 1}</strong>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => duplicatePackage(index)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
+                <button
+                  onClick={() => duplicatePackage(index)}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}
+                >
                   Dupliciraj
                 </button>
-                {items.length > 1 && (
-                  <button onClick={() => removePackage(index)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
+                {packages.length > 1 && (
+                  <button
+                    onClick={() => removePackage(index)}
+                    style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}
+                  >
                     Obriši
                   </button>
                 )}
@@ -485,19 +470,19 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
               <div>
                 <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
-                <input type="number" step="0.01" value={item.weight} onChange={(e) => updateItem(index, "weight", Number(e.target.value))} style={baseInputStyle()} />
+                <input type="number" step="0.01" value={pkg.weight} onChange={(e) => updatePackage(index, "weight", Number(e.target.value))} style={inputStyle()} />
               </div>
               <div>
                 <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
-                <input type="number" value={item.length} onChange={(e) => updateItem(index, "length", Number(e.target.value))} style={baseInputStyle()} />
+                <input type="number" value={pkg.length} onChange={(e) => updatePackage(index, "length", Number(e.target.value))} style={inputStyle()} />
               </div>
               <div>
                 <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
-                <input type="number" value={item.width} onChange={(e) => updateItem(index, "width", Number(e.target.value))} style={baseInputStyle()} />
+                <input type="number" value={pkg.width} onChange={(e) => updatePackage(index, "width", Number(e.target.value))} style={inputStyle()} />
               </div>
               <div>
                 <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
-                <input type="number" value={item.height} onChange={(e) => updateItem(index, "height", Number(e.target.value))} style={baseInputStyle()} />
+                <input type="number" value={pkg.height} onChange={(e) => updatePackage(index, "height", Number(e.target.value))} style={inputStyle()} />
               </div>
             </div>
           </div>
@@ -505,7 +490,7 @@ export default function App() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>
-        <div style={cardStyle()}>
+        <div style={boxStyle()}>
           <div style={{ color: "#666", fontSize: 14, marginBottom: 8 }}>MBE Economy</div>
           {results?.economyWinner ? (
             <>
@@ -518,13 +503,15 @@ export default function App() {
           )}
         </div>
 
-        <div style={cardStyle()}>
+        <div style={boxStyle()}>
           <div style={{ color: "#666", fontSize: 14, marginBottom: 8 }}>MBE Express</div>
           {results ? (
             <>
               <div style={{ fontSize: 24, fontWeight: 700 }}>GLS</div>
               <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{money(results.express.price)}</div>
-              <div style={{ color: "#555", marginTop: 8 }}>{results.express.possible ? results.express.details.join(" · ") : results.express.details[0]}</div>
+              <div style={{ color: "#555", marginTop: 8 }}>
+                {results.express.possible ? results.express.details.join(" · ") : results.express.details[0]}
+              </div>
             </>
           ) : (
             <div style={{ color: "#666" }}>Upiši sve podatke pošiljke.</div>
@@ -537,7 +524,7 @@ export default function App() {
           <h2>Sve economy opcije</h2>
           <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
             {results.economy.map((result) => (
-              <div key={result.name} style={cardStyle(result.name === results.economyWinner?.name)}>
+              <div key={result.name} style={boxStyle(result.name === results.economyWinner?.name)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 20 }}>{result.name}</div>
@@ -550,14 +537,23 @@ export default function App() {
           </div>
 
           <h2>Express opcija</h2>
-          <div style={cardStyle()}>
+          <div style={boxStyle()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 20 }}>GLS</div>
-                <div style={{ color: "#555", marginTop: 6 }}>{results.express.possible ? results.express.details.join(" · ") : results.express.details[0]}</div>
+                <div style={{ color: "#555", marginTop: 6 }}>
+                  {results.express.possible ? results.express.details.join(" · ") : results.express.details[0]}
+                </div>
               </div>
               <div style={{ fontWeight: 800, fontSize: 28 }}>{money(results.express.price)}</div>
             </div>
           </div>
 
-          <div style={{ marginTop: 24, color: "#555", fontSize: 
+          <div style={{ marginTop: 24, color: "#555", fontSize: 14 }}>
+            Otok: {isIsland(postalCode) ? "Da" : "Ne"} · Overseas posebna zona: {isOverseasSpecial(postalCode) ? "Da" : "Ne"} · InTime zona: Z{getInTimeZone(postalCode)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
