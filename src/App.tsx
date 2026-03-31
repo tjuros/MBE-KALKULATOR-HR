@@ -15,6 +15,16 @@ type PriceResult = {
   serviceType: "MBE Economy" | "MBE Express";
 };
 
+const LOGOS: Record<string, string> = {
+  MBE: "https://www.mbe.hr/wp-content/uploads/2020/04/mbe-logo.png",
+  HP: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Hrvatska_po%C5%A1ta_logo.svg/512px-Hrvatska_po%C5%A1ta_logo.svg.png",
+  DPD: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/DPD_logo.svg/512px-DPD_logo.svg.png",
+  GLS: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/GLS_Logo.svg/512px-GS_Logo.svg.png",
+  "Overseas Single": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
+  "Overseas Multi": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
+  InTime: "https://www.in-time.hr/images/logo.png",
+};
+
 const SMALL_ISLANDS = new Set([
   "20221", "20222", "20223", "20224", "20225", "20226", "20290",
   "21225",
