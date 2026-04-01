@@ -422,26 +422,24 @@ function calcHP(
   }
 
   const kg = totalWeight(items);
-  const priceBase = tierPrice(HP_TABLE, kg);
+  let price = tierPrice(HP_TABLE, Math.min(kg, 30));
 
-  if (priceBase === null) {
-    return {
-      name: "HP",
-      price: null,
-      possible: false,
-      details: ["Pošiljka prelazi podržani HP cjenik"],
-      serviceType: "MBE Economy",
-      status: "no",
-    };
+  if (price === null) {
+    price = 5.45;
   }
 
-  const price = cod ? priceBase + 0.5 : priceBase;
+  if (cod) price += 0.5;
 
   return {
     name: "HP",
     price: round2(price),
     possible: true,
-    details: ["Obračun po pošiljci", cod ? "COD +0,50 €" : "Bez COD dodatka", "Bez otočnih nadoplata"],
+    details: [
+      "Max 30 kg po paketu",
+      "Obračun po pošiljci",
+      cod ? "COD +0,50 €" : "Bez COD dodatka",
+      "Bez otočnih nadoplata",
+    ],
     serviceType: "MBE Economy",
     status: "ok",
   };
@@ -563,7 +561,6 @@ function calcDPD(
   }
 
   let price = 0;
-
   if (items.length >= 2) price = items.length * 2.89;
   else price = tierPrice(DPD_TABLE, Math.min(items[0].weight, 31.5)) || 0;
 
@@ -609,7 +606,6 @@ function calcOSSingle(
   const reasons: string[] = [];
   const warnings: string[] = [];
   let base = 0;
-
   let heavySurcharge = 0;
   let bulkySurcharge = 0;
 
@@ -678,7 +674,6 @@ function calcOSMulti(
 
   const reasons: string[] = [];
   const warnings: string[] = [];
-
   let heavySurcharge = 0;
   let bulkySurcharge = 0;
 
@@ -951,7 +946,10 @@ export default function App() {
   };
 
   const addPackage = () => {
-    setPackages((prev) => [...prev, { weight: "", length: "", width: "", height: "" }]);
+    setPackages((prev) => [
+      ...prev,
+      { weight: "1", length: "10", width: "10", height: "10" },
+    ]);
   };
 
   const duplicatePackage = (index: number) => {
@@ -978,12 +976,33 @@ export default function App() {
 
   const additionalPackages = packages.slice(1);
 
+  const reviewSurcharges = useMemo(() => {
+    if (!results) return [];
+    const surchargeDetails = [...results.economy, results.express]
+      .filter((r) => r.status === "surcharge")
+      .flatMap((r) =>
+        r.details.filter((d) =>
+          d.includes("+") &&
+          (
+            d.toLowerCase().includes("dimenz") ||
+            d.toLowerCase().includes("tež") ||
+            d.toLowerCase().includes("teški") ||
+            d.toLowerCase().includes("glomaz") ||
+            d.toLowerCase().includes("otočna")
+          )
+        )
+      );
+
+    return [...new Set(surchargeDetails)];
+  }, [results]);
+
   return (
     <div
       style={{
         minHeight: "100vh",
         background: "#f8fafc",
         padding: isMobile ? 12 : 16,
+        paddingBottom: isMobile ? 140 : 16,
         fontFamily: "Ubuntu, Arial, sans-serif",
       }}
     >
@@ -1198,21 +1217,67 @@ export default function App() {
             <div style={{ marginTop: 12, color: "#64748b" }}>Upiši poštanski broj i sve dimenzije paketa.</div>
           )}
         </details>
+      </div>
 
-        <details style={cardStyle()}>
-          <summary style={sectionSummaryStyle()}>
-            <span>Brzi status</span>
-            <span style={{ color: "#64748b", fontWeight: 700 }}>{postalCode ? postalCode : "—"}</span>
-          </summary>
+      <div
+        style={{
+          position: isMobile ? "fixed" : "sticky",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 30,
+          padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : "0",
+          background: isMobile ? "rgba(248, 250, 252, 0.96)" : "transparent",
+          backdropFilter: isMobile ? "blur(10px)" : "none",
+          borderTop: isMobile ? "1px solid #e5e7eb" : "none",
+        }}
+      >
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <details style={cardStyle()} open={!isMobile}>
+            <summary style={sectionSummaryStyle()}>
+              <span>Pregled pošiljke</span>
+              <span style={{ color: "#64748b", fontWeight: 700 }}>
+                {results?.overallWinner ? money(results.overallWinner.price) : postalCode || "—"}
+              </span>
+            </summary>
 
-          <div style={{ marginTop: 12, display: "grid", gap: 8, color: "#475569" }}>
-            <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-            <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-            <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
-            <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
-            <div>Broj paketa: <strong>{packages.length}</strong></div>
-          </div>
-        </details>
+            <div style={{ marginTop: 12, display: "grid", gap: 8, color: "#475569" }}>
+              <div>Poštanski broj: <strong>{postalCode || "-"}</strong></div>
+              <div>Broj paketa: <strong>{packages.length}</strong></div>
+              <div>Pošiljka: <strong>{packages.length === 1 ? "1 paket" : `${packages.length} paketa`}</strong></div>
+              <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
+              <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
+              <div>
+                Nestandardno:{" "}
+                <strong>
+                  {results
+                    ? [...results.economy, results.express].some((r) => r.status === "surcharge")
+                      ? "Da"
+                      : "Ne"
+                    : "-"}
+                </strong>
+              </div>
+              <div>
+                Nadoplate:{" "}
+                <strong>
+                  {results
+                    ? reviewSurcharges.length
+                      ? reviewSurcharges.join(" · ")
+                      : "Nema"
+                    : "-"}
+                </strong>
+              </div>
+              <div>
+                Najpovoljnija opcija:{" "}
+                <strong>
+                  {results?.overallWinner
+                    ? `${results.overallWinner.name} (${money(results.overallWinner.price)})`
+                    : "-"}
+                </strong>
+              </div>
+            </div>
+          </details>
+        </div>
       </div>
     </div>
   );
