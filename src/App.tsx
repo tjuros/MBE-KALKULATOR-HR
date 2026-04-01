@@ -19,7 +19,7 @@ const LOGOS: Record<string, string> = {
   MBE: "https://www.mbe.hr/wp-content/uploads/2020/04/mbe-logo.png",
   HP: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Hrvatska_po%C5%A1ta_logo.svg/512px-Hrvatska_po%C5%A1ta_logo.svg.png",
   DPD: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/DPD_logo.svg/512px-DPD_logo.svg.png",
-  GLS: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/GLS_Logo.svg/512px-GS_Logo.svg.png",
+  GLS: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/GLS_Logo.svg/512px-GLS_Logo.svg.png",
   "Overseas Single": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
   "Overseas Multi": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
   InTime: "https://www.in-time.hr/images/logo.png",
@@ -252,6 +252,7 @@ function inputStyle(): React.CSSProperties {
     borderRadius: 10,
     width: "100%",
     boxSizing: "border-box",
+    fontFamily: "inherit",
   };
 }
 
@@ -264,16 +265,16 @@ function buttonStyle(primary = false): React.CSSProperties {
     color: primary ? "#fff" : "#111827",
     cursor: "pointer",
     fontWeight: 600,
+    fontFamily: "inherit",
   };
 }
 
-function cardStyle(highlight = false, sticky = false): React.CSSProperties {
+function cardStyle(highlight = false): React.CSSProperties {
   return {
     border: highlight ? "2px solid #16a34a" : "1px solid #e5e7eb",
     background: highlight ? "#f0fdf4" : "#fff",
     borderRadius: 14,
     padding: 16,
-    boxShadow: sticky ? "0 8px 20px rgba(0,0,0,0.08)" : "none",
   };
 }
 
@@ -498,17 +499,33 @@ function ResultRow({
   highlighted: boolean;
 }) {
   return (
-    <div style={boxStyle(highlighted)}>
+    <div style={cardStyle(highlighted)}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 20 }}>{result.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {LOGOS[result.name] ? (
+              <img
+                src={LOGOS[result.name]}
+                alt={result.name}
+                style={{ height: 24, width: "auto", objectFit: "contain" }}
+              />
+            ) : null}
+            <div style={{ fontWeight: 700, fontSize: 20 }}>{result.name}</div>
+          </div>
+
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={badgeStyle(result.serviceType === "MBE Express" ? "warn" : "ok")}>{result.serviceType}</span>
-            <span style={badgeStyle(result.possible ? "ok" : "warn")}>{result.possible ? "Moguće" : "Nije moguće"}</span>
+            <span style={badgeStyle(result.serviceType === "MBE Express" ? "warn" : "ok")}>
+              {result.serviceType}
+            </span>
+            <span style={badgeStyle(result.possible ? "ok" : "warn")}>
+              {result.possible ? "Moguće" : "Nije moguće"}
+            </span>
             {highlighted && result.possible ? <span style={badgeStyle("info")}>Preporuka</span> : null}
           </div>
+
           <div style={{ color: "#555", marginTop: 10 }}>{result.details.join(" · ")}</div>
         </div>
+
         <div style={{ fontSize: 30, fontWeight: 800 }}>{money(result.price)}</div>
       </div>
     </div>
@@ -595,27 +612,24 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc", padding: 16 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        padding: 16,
+        fontFamily: "Ubuntu, Arial, sans-serif",
+      }}
+    >
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gap: 16 }}>
-        <div style={{ position: "sticky", top: 8, zIndex: 50 }}>
-          <div style={cardStyle(false, true)}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Sticky pregled</div>
-                <div style={{ fontSize: 28, fontWeight: 800 }}>
-                  {results?.economyWinner ? `${results.economyWinner.name} — ${money(results.economyWinner.price)}` : "Upiši pošiljku"}
-                </div>
-                <div style={{ color: "#64748b", marginTop: 4 }}>
-                  Express: {results ? money(results.express.price) : "—"} · Paketa: {packages.length} · Ukupno: {total.toFixed(2)} kg
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={buttonStyle()} onClick={() => quickSet(1)}>1 paket</button>
-                <button style={buttonStyle()} onClick={() => quickSet(2)}>2 paketa</button>
-                <button style={buttonStyle()} onClick={() => quickSet(5)}>5 paketa</button>
-                <button style={buttonStyle()} onClick={resetShipment}>Reset</button>
-              </div>
-            </div>
+        <div style={{ ...cardStyle(), display: "flex", alignItems: "center", gap: 14 }}>
+          <img
+            src={LOGOS.MBE}
+            alt="Mail Boxes Etc."
+            style={{ height: 42, width: "auto", objectFit: "contain" }}
+          />
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1 }}>Mail Boxes Etc.</div>
+            <div style={{ color: "#64748b", marginTop: 4 }}>MBE kalkulator HR</div>
           </div>
         </div>
 
@@ -638,6 +652,13 @@ export default function App() {
                 <input type="checkbox" checked={cod} onChange={(e) => setCod(e.target.checked)} />
                 COD / pouzeće
               </label>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button style={buttonStyle()} onClick={() => quickSet(1)}>1 paket</button>
+                <button style={buttonStyle()} onClick={() => quickSet(2)}>2 paketa</button>
+                <button style={buttonStyle()} onClick={() => quickSet(5)}>5 paketa</button>
+                <button style={buttonStyle()} onClick={resetShipment}>Reset</button>
+              </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button style={buttonStyle()} onClick={() => applyPreset({ weight: 1, length: 20, width: 20, height: 10 })}>Mala kutija</button>
@@ -694,7 +715,16 @@ export default function App() {
               <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>MBE Economy</div>
               {results?.economyWinner ? (
                 <>
-                  <div style={{ fontSize: 30, fontWeight: 800, marginTop: 8 }}>{results.economyWinner.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                    {LOGOS[results.economyWinner.name] ? (
+                      <img
+                        src={LOGOS[results.economyWinner.name]}
+                        alt={results.economyWinner.name}
+                        style={{ height: 26, width: "auto", objectFit: "contain" }}
+                      />
+                    ) : null}
+                    <div style={{ fontSize: 30, fontWeight: 800 }}>{results.economyWinner.name}</div>
+                  </div>
                   <div style={{ fontSize: 36, fontWeight: 900, marginTop: 8 }}>{money(results.economyWinner.price)}</div>
                   <div style={{ marginTop: 10, color: "#475569" }}>{results.economyWinner.details.join(" · ")}</div>
                 </>
@@ -707,11 +737,18 @@ export default function App() {
               <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>MBE Express</div>
               {results ? (
                 <>
-                  <div style={{ fontSize: 30, fontWeight: 800, marginTop: 8 }}>GLS</div>
-                  <div style={{ fontSize: 36, fontWeight: 900, marginTop: 8 }}>{money(results.express.price)}</div>
-                  <div style={{ marginTop: 10, color: "#475569" }}>
-                    {results.express.details.join(" · ")}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                    {LOGOS.GLS ? (
+                      <img
+                        src={LOGOS.GLS}
+                        alt="GLS"
+                        style={{ height: 26, width: "auto", objectFit: "contain" }}
+                      />
+                    ) : null}
+                    <div style={{ fontSize: 30, fontWeight: 800 }}>GLS</div>
                   </div>
+                  <div style={{ fontSize: 36, fontWeight: 900, marginTop: 8 }}>{money(results.express.price)}</div>
+                  <div style={{ marginTop: 10, color: "#475569" }}>{results.express.details.join(" · ")}</div>
                 </>
               ) : (
                 <div style={{ color: "#64748b", marginTop: 8 }}>Upiši sve podatke pošiljke.</div>
