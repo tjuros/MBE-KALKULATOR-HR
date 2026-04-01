@@ -20,14 +20,14 @@ type PriceResult = {
   status: CarrierStatus;
 };
 
-const SMALL_ISLANDS = new Set([
-  "20221", "20222", "20223", "20224", "20225", "20226", "20290",
+const ISLAND_POSTALS = new Set([
+  "20221", "20222", "20223", "20224", "20225", "20226", "20289", "20290",
   "21225",
   "21430", "21432",
   "22232", "22233", "22234", "22235", "22236",
   "23281", "23282", "23283", "23284", "23285", "23286", "23287",
   "23291", "23292", "23293", "23294", "23295", "23296",
-  "51552", "51561", "51562",
+  "51550", "51551", "51552", "51554", "51555", "51557", "51561", "51562",
 ]);
 
 const DPD_FREE_ISLANDS = new Set([
@@ -41,7 +41,7 @@ const DPD_FREE_ISLANDS = new Set([
 const GLS_ALLOWED_ISLANDS = new Set([
   "51500", "51511", "51512", "51513", "51514", "51515", "51516", "51517",
   "51280",
-  "51550", "51557", "51562",
+  "51550", "51551", "51552", "51554", "51555", "51557", "51562",
   "23234", "23250", "53291",
   "21220", "21223",
   "22243",
@@ -203,7 +203,7 @@ function parseNum(value: string) {
 }
 
 function isIsland(postal: string) {
-  return SMALL_ISLANDS.has(postal);
+  return ISLAND_POSTALS.has(postal);
 }
 
 function isOverseasSpecial(postal: string) {
@@ -816,6 +816,122 @@ function ResultRow({
   );
 }
 
+function ResultsBlock({
+  results,
+  postalCode,
+  total,
+  packagesCount,
+  isMobile,
+}: {
+  results: { economy: PriceResult[]; express: PriceResult; overallWinner: PriceResult | null } | null;
+  postalCode: string;
+  total: number;
+  packagesCount: number;
+  isMobile: boolean;
+}) {
+  if (!results) return null;
+
+  return (
+    <>
+      <div style={cardStyle(!!results.overallWinner)}>
+        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+          Preporuka
+        </div>
+        {results.overallWinner ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+              <CarrierPill name={results.overallWinner.name} />
+              <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>
+                {results.overallWinner.name}
+              </div>
+            </div>
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span style={serviceBadgeStyle(results.overallWinner.serviceType)}>
+                {results.overallWinner.serviceType}
+              </span>
+              {statusBadge(results.overallWinner.status)}
+              <span style={badgeStyle("info")}>Najpovoljnija opcija</span>
+            </div>
+            <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
+              {money(results.overallWinner.price)}
+            </div>
+            <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
+              {results.overallWinner.details.join(" · ")}
+            </div>
+            {results.overallWinner.warning ? (
+              <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
+                PAZI: {results.overallWinner.warning}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+
+      <div style={cardStyle()}>
+        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+          MBE Express
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+          <CarrierPill name="GLS" />
+          <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>GLS</div>
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={serviceBadgeStyle(results.express.serviceType)}>{results.express.serviceType}</span>
+          {statusBadge(results.express.status)}
+          {results.express.name === results.overallWinner?.name && results.express.possible ? (
+            <span style={badgeStyle("info")}>Preporuka</span>
+          ) : null}
+        </div>
+        <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
+          {money(results.express.price)}
+        </div>
+        <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
+          {results.express.details.join(" · ")}
+        </div>
+        {results.express.warning ? (
+          <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
+            PAZI: {results.express.warning}
+          </div>
+        ) : null}
+      </div>
+
+      <div style={cardStyle()}>
+        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+          Brzi status
+        </div>
+        <div style={{ marginTop: 10, display: "grid", gap: 8, color: "#475569" }}>
+          <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
+          <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
+          <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
+          <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
+          <div>Broj paketa: <strong>{packagesCount}</strong></div>
+        </div>
+      </div>
+
+      <div>
+        <h2 style={{ marginBottom: 12 }}>Sve economy opcije</h2>
+        <div style={{ display: "grid", gap: 12 }}>
+          {results.economy.map((r) => (
+            <ResultRow
+              key={r.name}
+              result={r}
+              highlighted={r.name === results.overallWinner?.name}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 style={{ marginBottom: 12 }}>Express opcija</h2>
+        <ResultRow
+          result={results.express}
+          highlighted={results.express.name === results.overallWinner?.name}
+        />
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const isMobile = useIsMobile();
 
@@ -910,6 +1026,8 @@ export default function App() {
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
   };
 
+  const additionalPackages = packages.slice(1);
+
   return (
     <div
       style={{
@@ -957,13 +1075,13 @@ export default function App() {
                   inputMode="numeric"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                  placeholder="npr. 48260"
+                  placeholder="npr. 51550"
                   style={inputStyle()}
                 />
               </div>
 
               <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ fontWeight: 700 }}>Prvi paket</div>
+                <div style={{ fontWeight: 700 }}>Paket 1</div>
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 10 }}>
                   <div>
                     <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
@@ -1020,10 +1138,43 @@ export default function App() {
                 <input type="checkbox" checked={cod} onChange={(e) => setCod(e.target.checked)} />
                 COD / pouzeće
               </label>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button style={buttonStyle()} onClick={() => duplicatePackage(0)}>
+                  Dupliciraj paket 1
+                </button>
+                <button style={buttonStyle(true)} onClick={addPackage}>
+                  Dodaj paket
+                </button>
+              </div>
             </div>
+          </div>
 
-            <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #e5e7eb" }} />
+          {!isMobile ? (
+            <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
+              <ResultsBlock
+                results={results}
+                postalCode={postalCode}
+                total={total}
+                packagesCount={packages.length}
+                isMobile={isMobile}
+              />
+            </div>
+          ) : null}
+        </div>
 
+        {isMobile ? (
+          <ResultsBlock
+            results={results}
+            postalCode={postalCode}
+            total={total}
+            packagesCount={packages.length}
+            isMobile={isMobile}
+          />
+        ) : null}
+
+        {additionalPackages.length > 0 ? (
+          <div style={cardStyle()}>
             <div
               style={{
                 display: "flex",
@@ -1034,196 +1185,88 @@ export default function App() {
                 flexWrap: "wrap",
               }}
             >
-              <h3 style={{ margin: 0 }}>Paketi</h3>
+              <h3 style={{ margin: 0 }}>Dodatni paketi</h3>
               <button style={buttonStyle(true)} onClick={addPackage}>Dodaj paket</button>
             </div>
 
             <div style={{ display: "grid", gap: 12 }}>
-              {packages.map((pkg, index) => (
-                <div key={index} style={{ ...cardStyle(), padding: 14 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 10,
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <strong>Paket {index + 1}</strong>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button style={buttonStyle()} onClick={() => duplicatePackage(index)}>Dupliciraj</button>
-                      {packages.length > 1 ? (
+              {additionalPackages.map((pkg, localIndex) => {
+                const index = localIndex + 1;
+
+                return (
+                  <div key={index} style={{ ...cardStyle(), padding: 14 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <strong>Paket {index + 1}</strong>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button style={buttonStyle()} onClick={() => duplicatePackage(index)}>Dupliciraj</button>
                         <button style={buttonStyle()} onClick={() => removePackage(index)}>Obriši</button>
-                      ) : null}
+                      </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 10 }}>
-                    <div>
-                      <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
-                      <input
-                        {...commonInputProps}
-                        inputMode="decimal"
-                        type="text"
-                        value={pkg.weight}
-                        onChange={(e) => updatePackage(index, "weight", e.target.value)}
-                        placeholder="npr. 2"
-                        style={inputStyle()}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
-                      <input
-                        {...commonInputProps}
-                        inputMode="decimal"
-                        type="text"
-                        value={pkg.length}
-                        onChange={(e) => updatePackage(index, "length", e.target.value)}
-                        placeholder="npr. 30"
-                        style={inputStyle()}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
-                      <input
-                        {...commonInputProps}
-                        inputMode="decimal"
-                        type="text"
-                        value={pkg.width}
-                        onChange={(e) => updatePackage(index, "width", e.target.value)}
-                        placeholder="npr. 20"
-                        style={inputStyle()}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
-                      <input
-                        {...commonInputProps}
-                        inputMode="decimal"
-                        type="text"
-                        value={pkg.height}
-                        onChange={(e) => updatePackage(index, "height", e.target.value)}
-                        placeholder="npr. 10"
-                        style={inputStyle()}
-                      />
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 10 }}>
+                      <div>
+                        <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
+                        <input
+                          {...commonInputProps}
+                          inputMode="decimal"
+                          type="text"
+                          value={pkg.weight}
+                          onChange={(e) => updatePackage(index, "weight", e.target.value)}
+                          placeholder="npr. 2"
+                          style={inputStyle()}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
+                        <input
+                          {...commonInputProps}
+                          inputMode="decimal"
+                          type="text"
+                          value={pkg.length}
+                          onChange={(e) => updatePackage(index, "length", e.target.value)}
+                          placeholder="npr. 30"
+                          style={inputStyle()}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
+                        <input
+                          {...commonInputProps}
+                          inputMode="decimal"
+                          type="text"
+                          value={pkg.width}
+                          onChange={(e) => updatePackage(index, "width", e.target.value)}
+                          placeholder="npr. 20"
+                          style={inputStyle()}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
+                        <input
+                          {...commonInputProps}
+                          inputMode="decimal"
+                          type="text"
+                          value={pkg.height}
+                          onChange={(e) => updatePackage(index, "height", e.target.value)}
+                          placeholder="npr. 10"
+                          style={inputStyle()}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
-
-          <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
-            <div style={cardStyle(!!results?.overallWinner)}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
-                Preporuka
-              </div>
-              {results?.overallWinner ? (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                    <CarrierPill name={results.overallWinner.name} />
-                    <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>
-                      {results.overallWinner.name}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <span style={serviceBadgeStyle(results.overallWinner.serviceType)}>
-                      {results.overallWinner.serviceType}
-                    </span>
-                    {statusBadge(results.overallWinner.status)}
-                    <span style={badgeStyle("info")}>Najpovoljnija opcija</span>
-                  </div>
-                  <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
-                    {money(results.overallWinner.price)}
-                  </div>
-                  <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
-                    {results.overallWinner.details.join(" · ")}
-                  </div>
-                  {results.overallWinner.warning ? (
-                    <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
-                      PAZI: {results.overallWinner.warning}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div style={{ color: "#64748b", marginTop: 8 }}>Upiši sve podatke pošiljke.</div>
-              )}
-            </div>
-
-            <div style={cardStyle()}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
-                MBE Express
-              </div>
-              {results ? (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                    <CarrierPill name="GLS" />
-                    <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>GLS</div>
-                  </div>
-                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <span style={serviceBadgeStyle(results.express.serviceType)}>{results.express.serviceType}</span>
-                    {statusBadge(results.express.status)}
-                    {results.express.name === results.overallWinner?.name && results.express.possible ? (
-                      <span style={badgeStyle("info")}>Preporuka</span>
-                    ) : null}
-                  </div>
-                  <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
-                    {money(results.express.price)}
-                  </div>
-                  <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
-                    {results.express.details.join(" · ")}
-                  </div>
-                  {results.express.warning ? (
-                    <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
-                      PAZI: {results.express.warning}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div style={{ color: "#64748b", marginTop: 8 }}>Upiši sve podatke pošiljke.</div>
-              )}
-            </div>
-
-            <div style={cardStyle()}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
-                Brzi status
-              </div>
-              <div style={{ marginTop: 10, display: "grid", gap: 8, color: "#475569" }}>
-                <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-                <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-                <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
-                <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
-                <div>Broj paketa: <strong>{packages.length}</strong></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {results ? (
-          <>
-            <div>
-              <h2 style={{ marginBottom: 12 }}>Sve economy opcije</h2>
-              <div style={{ display: "grid", gap: 12 }}>
-                {results.economy.map((r) => (
-                  <ResultRow
-                    key={r.name}
-                    result={r}
-                    highlighted={r.name === results.overallWinner?.name}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h2 style={{ marginBottom: 12 }}>Express opcija</h2>
-              <ResultRow
-                result={results.express}
-                highlighted={results.express.name === results.overallWinner?.name}
-              />
-            </div>
-          </>
         ) : null}
       </div>
     </div>
