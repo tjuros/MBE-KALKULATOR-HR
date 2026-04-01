@@ -1020,7 +1020,7 @@ export default function App() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
-              <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 900, lineHeight: 1.1 }}>
+              <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 900, lineHeight: 1.1 }}>
                 MBE SmartChoice
               </div>
             </div>
