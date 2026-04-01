@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 type PackageItem = {
-  weight: number;
-  length: number;
-  width: number;
-  height: number;
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
 };
+
+type CarrierStatus = "ok" | "surcharge" | "no";
 
 type PriceResult = {
   name: string;
@@ -15,6 +17,7 @@ type PriceResult = {
   serviceType: "MBE Economy" | "MBE Express";
   warning?: string;
   manualCheck?: boolean;
+  status: CarrierStatus;
 };
 
 const SMALL_ISLANDS = new Set([
@@ -192,6 +195,13 @@ function money(n: number | null) {
   }).format(n);
 }
 
+function parseNum(value: string) {
+  if (value.trim() === "") return null;
+  const normalized = value.replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function isIsland(postal: string) {
   return SMALL_ISLANDS.has(postal);
 }
@@ -217,11 +227,11 @@ function tierPrice(table: Array<{ max: number; price: number }>, value: number) 
   return row ? row.price : null;
 }
 
-function totalWeight(items: PackageItem[]) {
+function totalWeight(items: Array<{ weight: number; length: number; width: number; height: number }>) {
   return round2(items.reduce((sum, item) => sum + Number(item.weight || 0), 0));
 }
 
-function volumeWeightInTime(items: PackageItem[]) {
+function volumeWeightInTime(items: Array<{ weight: number; length: number; width: number; height: number }>) {
   return round2(
     items.reduce((sum, p) => {
       const l = Number(p.length || 0) / 100;
@@ -232,7 +242,7 @@ function volumeWeightInTime(items: PackageItem[]) {
   );
 }
 
-function girth(p: PackageItem) {
+function girth(p: { length: number; width: number; height: number }) {
   return Number(p.length) + 2 * Number(p.width) + 2 * Number(p.height);
 }
 
@@ -288,11 +298,12 @@ function cardStyle(highlight = false): React.CSSProperties {
   };
 }
 
-function badgeStyle(type: "ok" | "warn" | "info"): React.CSSProperties {
+function badgeStyle(type: "ok" | "warn" | "info" | "danger"): React.CSSProperties {
   const styles = {
     ok: { background: "#dcfce7", color: "#166534" },
     warn: { background: "#ffedd5", color: "#9a3412" },
     info: { background: "#e0f2fe", color: "#075985" },
+    danger: { background: "#fee2e2", color: "#991b1b" },
   };
   return {
     display: "inline-block",
@@ -365,7 +376,16 @@ function CarrierPill({ name }: { name: string }) {
   return <div style={carrierPillStyle(name)}>{name}</div>;
 }
 
-function calcHP(items: PackageItem[], cod: boolean): PriceResult {
+function statusBadge(status: CarrierStatus) {
+  if (status === "ok") return <span style={badgeStyle("ok")}>Moguće</span>;
+  if (status === "surcharge") return <span style={badgeStyle("warn")}>Moguće uz nadoplatu</span>;
+  return <span style={badgeStyle("danger")}>Nije moguće</span>;
+}
+
+function calcHP(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  cod: boolean
+): PriceResult {
   const reasons: string[] = [];
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
@@ -376,7 +396,14 @@ function calcHP(items: PackageItem[], cod: boolean): PriceResult {
   }
 
   if (reasons.length) {
-    return { name: "HP", price: null, possible: false, details: reasons, serviceType: "MBE Economy" };
+    return {
+      name: "HP",
+      price: null,
+      possible: false,
+      details: reasons,
+      serviceType: "MBE Economy",
+      status: "no",
+    };
   }
 
   const kg = totalWeight(items);
@@ -390,29 +417,64 @@ function calcHP(items: PackageItem[], cod: boolean): PriceResult {
     possible: true,
     details: ["Obračun po pošiljci", cod ? "COD +0,50 €" : "Bez COD dodatka", "Bez otočnih nadoplata"],
     serviceType: "MBE Economy",
+    status: "ok",
   };
 }
 
-function calcGLS(items: PackageItem[], postal: string, cod: boolean): PriceResult {
+function calcGLS(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  postal: string,
+  cod: boolean
+): PriceResult {
   const reasons: string[] = [];
+  const warnings: string[] = [];
   const table = items.length === 1 ? GLS_1 : items.length <= 4 ? GLS_2_4 : GLS_5P;
+
+  let oversizeSurcharge = 0;
+  let overweightSurcharge = 0;
 
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
-    if (p.weight > 40) reasons.push(`Paket ${i + 1}: masa > 40 kg`);
-    if (p.length > 200 || p.width > 80 || p.height > 60) reasons.push(`Paket ${i + 1}: prelazi 200×80×60 cm`);
-    if (girth(p) > 300) reasons.push(`Paket ${i + 1}: L+2Š+2V > 300 cm`);
+
+    if (p.weight > 50) reasons.push(`Paket ${i + 1}: masa je previsoka za GLS`);
+    if (p.length > 250 || p.width > 120 || p.height > 80) {
+      reasons.push(`Paket ${i + 1}: dimenzije su previsoke za GLS`);
+    }
+
+    const oversize = p.length > 200 || p.width > 80 || p.height > 60 || girth(p) > 300;
+    const overweight = p.weight > 40;
+
+    if (oversize && !reasons.length) {
+      oversizeSurcharge += 5.39;
+      warnings.push(`Paket ${i + 1}: paket prekomjernih dimenzija +5,39 €`);
+    }
+
+    if (overweight && !reasons.length) {
+      overweightSurcharge += 2.06;
+      warnings.push(`Paket ${i + 1}: paket prekomjerne težine +2,06 €`);
+    }
   }
 
   if (!isGlsPossible(postal)) reasons.push("GLS nije moguć za ovaj poštanski broj / otok");
 
   if (reasons.length) {
-    return { name: "GLS", price: null, possible: false, details: reasons, serviceType: "MBE Express" };
+    return {
+      name: "GLS",
+      price: null,
+      possible: false,
+      details: reasons,
+      serviceType: "MBE Express",
+      status: "no",
+    };
   }
 
-  let price = items.reduce((sum, p) => sum + (tierPrice(table, p.weight) || 0), 0);
+  let price = items.reduce((sum, p) => sum + (tierPrice(table, Math.min(p.weight, 40)) || 0), 0);
   price *= 1.19;
   if (cod) price += 0.43;
+
+  price += oversizeSurcharge + overweightSurcharge;
+
+  const hasSurcharge = oversizeSurcharge > 0 || overweightSurcharge > 0;
 
   return {
     name: "GLS",
@@ -422,58 +484,132 @@ function calcGLS(items: PackageItem[], postal: string, cod: boolean): PriceResul
       items.length === 1 ? "1 paket cjenik" : items.length <= 4 ? "2–4 paketa cjenik" : "5+ paketa cjenik",
       "+19% dodatak",
       cod ? "COD +0,43 €" : "Bez COD dodatka",
+      ...(oversizeSurcharge > 0 ? [`Prekomjerne dimenzije +${oversizeSurcharge.toFixed(2)} €`] : []),
+      ...(overweightSurcharge > 0 ? [`Prekomjerna težina +${overweightSurcharge.toFixed(2)} €`] : []),
     ],
+    warning: warnings.length ? warnings.join(" · ") : undefined,
+    manualCheck: hasSurcharge,
     serviceType: "MBE Express",
+    status: hasSurcharge ? "surcharge" : "ok",
   };
 }
 
-function calcDPD(items: PackageItem[], postal: string): PriceResult {
+function calcDPD(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  postal: string
+): PriceResult {
   const reasons: string[] = [];
+  const warnings: string[] = [];
+
+  let oversizeSurcharge = 0;
+  let overweightSurcharge = 0;
+
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
-    if (p.weight > 31.5) reasons.push(`Paket ${i + 1}: masa > 31,5 kg`);
-    if (p.length > 175) reasons.push(`Paket ${i + 1}: duljina > 175 cm`);
-    if (girth(p) > 300) reasons.push(`Paket ${i + 1}: L+2Š+2V > 300 cm`);
+
+    if (p.weight > 70) {
+      reasons.push(`Paket ${i + 1}: masa je previsoka za standardni DPD obračun`);
+    }
+
+    if (p.length > 220 || girth(p) > 360) {
+      reasons.push(`Paket ${i + 1}: dimenzije su previsoke za standardni DPD obračun`);
+    }
+
+    const isOversize = p.length > 175 || girth(p) > 300;
+    const overweightKg = Math.max(0, p.weight - 31.5);
+
+    if (isOversize) {
+      oversizeSurcharge += 25;
+      warnings.push(`Paket ${i + 1}: nestandardna dimenzija +25,00 €`);
+    }
+
+    if (overweightKg > 0) {
+      const surcharge = Math.ceil(overweightKg) * 2;
+      overweightSurcharge += surcharge;
+      warnings.push(`Paket ${i + 1}: prekomjerna težina +${surcharge.toFixed(2)} €`);
+    }
   }
 
   if (reasons.length) {
-    return { name: "DPD", price: null, possible: false, details: reasons, serviceType: "MBE Economy" };
+    return {
+      name: "DPD",
+      price: null,
+      possible: false,
+      details: reasons,
+      serviceType: "MBE Economy",
+      status: "no",
+    };
   }
 
   let price = 0;
-  if (items.length >= 2) price = items.length * 2.89;
-  else price = tierPrice(DPD_TABLE, items[0].weight) || 0;
 
-  const details = [items.length >= 2 ? "2+ paketa: 2,89 € po paketu" : "Standardni cjenik", "COD uključen"];
+  if (items.length >= 2) {
+    price = items.length * 2.89;
+  } else {
+    const billedWeight = Math.min(items[0].weight, 31.5);
+    price = tierPrice(DPD_TABLE, billedWeight) || 0;
+  }
+
+  const details = [
+    items.length >= 2 ? "2+ paketa: 2,89 € po paketu" : "Standardni cjenik",
+    "COD uključen",
+  ];
+
   if (isIsland(postal) && !DPD_FREE_ISLANDS.has(postal)) {
     price += 3.5;
     details.push("Otočna nadoplata +3,50 €");
   }
 
+  if (oversizeSurcharge > 0) {
+    price += oversizeSurcharge;
+    details.push(`Nestandardna dimenzija +${oversizeSurcharge.toFixed(2)} €`);
+  }
+
+  if (overweightSurcharge > 0) {
+    price += overweightSurcharge;
+    details.push(`Prekomjerna težina +${overweightSurcharge.toFixed(2)} €`);
+  }
+
+  const hasSurcharge = oversizeSurcharge > 0 || overweightSurcharge > 0;
+
   return {
     name: "DPD",
     price: round2(price),
     possible: true,
+    manualCheck: hasSurcharge,
+    warning: warnings.length ? warnings.join(" · ") : undefined,
     details,
     serviceType: "MBE Economy",
+    status: hasSurcharge ? "surcharge" : "ok",
   };
 }
 
-function calcOSSingle(items: PackageItem[], postal: string, cod: boolean): PriceResult {
+function calcOSSingle(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  postal: string,
+  cod: boolean
+): PriceResult {
   const reasons: string[] = [];
-  let base = 0;
-  let manualCheck = false;
   const warnings: string[] = [];
+  let base = 0;
+
+  let heavySurcharge = 0;
+  let bulkySurcharge = 0;
 
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
 
-    if (p.weight > 31.5) reasons.push(`Paket ${i + 1}: masa > 31,5 kg`);
+    if (p.weight > 50) reasons.push(`Paket ${i + 1}: masa je previsoka za standardni Overseas obračun`);
     if (girth(p) > 340) reasons.push(`Paket ${i + 1}: L+2Š+2V > 340 cm`);
 
+    if (p.weight > 31.5) {
+      heavySurcharge += 4;
+      warnings.push(`Paket ${i + 1}: teški paket +4,00 €`);
+    }
+
     if (p.length > 100) {
-      manualCheck = true;
-      warnings.push(`Paket ${i + 1}: duljina > 100 cm, moguća vangabaritna nadoplata`);
+      bulkySurcharge += 4;
+      warnings.push(`Paket ${i + 1}: glomazni paket +4,00 €`);
     }
 
     base += tierPrice(OS_SINGLE, Math.min(p.weight, 31.5)) || 0;
@@ -486,6 +622,7 @@ function calcOSSingle(items: PackageItem[], postal: string, cod: boolean): Price
       possible: false,
       details: reasons,
       serviceType: "MBE Economy",
+      status: "no",
     };
   }
 
@@ -493,38 +630,56 @@ function calcOSSingle(items: PackageItem[], postal: string, cod: boolean): Price
   if (cod) price += 0.3;
   if (isOverseasSpecial(postal)) price *= 1.2;
 
+  price += heavySurcharge + bulkySurcharge;
+
+  const hasSurcharge = heavySurcharge > 0 || bulkySurcharge > 0;
+
   return {
     name: "Overseas Single",
     price: round2(price),
     possible: true,
-    manualCheck,
+    manualCheck: hasSurcharge,
     warning: warnings.length ? warnings.join(" · ") : undefined,
     details: [
       "Obračun po paketu",
       "+5% dodatak",
       cod ? "COD +0,30 €" : "Bez COD dodatka",
       isOverseasSpecial(postal) ? "Posebna zona / otok +20%" : "Standardna zona",
+      ...(heavySurcharge > 0 ? [`Teški paket +${heavySurcharge.toFixed(2)} €`] : []),
+      ...(bulkySurcharge > 0 ? [`Glomazni paket +${bulkySurcharge.toFixed(2)} €`] : []),
     ],
     serviceType: "MBE Economy",
+    status: hasSurcharge ? "surcharge" : "ok",
   };
 }
 
-function calcOSMulti(items: PackageItem[], postal: string, cod: boolean): PriceResult | null {
+function calcOSMulti(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  postal: string,
+  cod: boolean
+): PriceResult | null {
   if (items.length < 2) return null;
 
   const reasons: string[] = [];
-  let manualCheck = false;
   const warnings: string[] = [];
+
+  let heavySurcharge = 0;
+  let bulkySurcharge = 0;
 
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
 
-    if (p.weight > 31.5) reasons.push(`Paket ${i + 1}: masa > 31,5 kg`);
+    if (p.weight > 50) reasons.push(`Paket ${i + 1}: masa je previsoka za standardni Overseas obračun`);
     if (girth(p) > 340) reasons.push(`Paket ${i + 1}: L+2Š+2V > 340 cm`);
 
+    if (p.weight > 31.5) {
+      heavySurcharge += 4;
+      warnings.push(`Paket ${i + 1}: teški paket +4,00 €`);
+    }
+
     if (p.length > 100) {
-      manualCheck = true;
-      warnings.push(`Paket ${i + 1}: duljina > 100 cm, moguća vangabaritna nadoplata`);
+      bulkySurcharge += 4;
+      warnings.push(`Paket ${i + 1}: glomazni paket +4,00 €`);
     }
   }
 
@@ -535,34 +690,48 @@ function calcOSMulti(items: PackageItem[], postal: string, cod: boolean): PriceR
       possible: false,
       details: reasons,
       serviceType: "MBE Economy",
+      status: "no",
     };
   }
 
   const kg = totalWeight(items);
   let base = tierPrice(OS_MULTI, kg);
-  if (base === null) base = 14.56 + Math.max(0, kg - 100) * 0.25;
+
+  if (base === null) {
+    base = 14.56 + Math.max(0, kg - 100) * 0.25;
+  }
 
   let price = base * 1.05;
   if (cod) price += 0.3;
   if (isOverseasSpecial(postal)) price *= 1.2;
 
+  price += heavySurcharge + bulkySurcharge;
+
+  const hasSurcharge = heavySurcharge > 0 || bulkySurcharge > 0;
+
   return {
     name: "Overseas Multi",
     price: round2(price),
     possible: true,
-    manualCheck,
+    manualCheck: hasSurcharge,
     warning: warnings.length ? warnings.join(" · ") : undefined,
     details: [
       "Obračun po pošiljci",
       "+5% dodatak",
       cod ? "COD +0,30 €" : "Bez COD dodatka",
       isOverseasSpecial(postal) ? "Posebna zona / otok +20%" : "Standardna zona",
+      ...(heavySurcharge > 0 ? [`Teški paket +${heavySurcharge.toFixed(2)} €`] : []),
+      ...(bulkySurcharge > 0 ? [`Glomazni paket +${bulkySurcharge.toFixed(2)} €`] : []),
     ],
     serviceType: "MBE Economy",
+    status: hasSurcharge ? "surcharge" : "ok",
   };
 }
 
-function calcInTime(items: PackageItem[], postal: string): PriceResult {
+function calcInTime(
+  items: Array<{ weight: number; length: number; width: number; height: number }>,
+  postal: string
+): PriceResult {
   const actual = totalWeight(items);
   const volumetric = volumeWeightInTime(items);
   const chargeable = Math.max(actual, volumetric);
@@ -576,6 +745,7 @@ function calcInTime(items: PackageItem[], postal: string): PriceResult {
       possible: false,
       details: ["Obračunska masa prelazi 1000 kg"],
       serviceType: "MBE Economy",
+      status: "no",
     };
   }
 
@@ -591,6 +761,7 @@ function calcInTime(items: PackageItem[], postal: string): PriceResult {
       "+15% gorivo",
     ],
     serviceType: "MBE Economy",
+    status: "ok",
   };
 }
 
@@ -612,11 +783,8 @@ function ResultRow({
 
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={serviceBadgeStyle(result.serviceType)}>{result.serviceType}</span>
-            <span style={badgeStyle(result.possible ? "ok" : "warn")}>
-              {result.possible ? "Moguće" : "Nije moguće"}
-            </span>
+            {statusBadge(result.status)}
             {highlighted && result.possible ? <span style={badgeStyle("info")}>Preporuka</span> : null}
-            {result.manualCheck ? <span style={badgeStyle("warn")}>Ručna provjera</span> : null}
           </div>
 
           <div style={{ color: "#555", marginTop: 10, lineHeight: 1.5 }}>{result.details.join(" · ")}</div>
@@ -640,28 +808,33 @@ export default function App() {
   const [postalCode, setPostalCode] = useState("");
   const [cod, setCod] = useState(false);
   const [packages, setPackages] = useState<PackageItem[]>([
-    { weight: 2, length: 30, width: 20, height: 10 },
+    { weight: "2", length: "30", width: "20", height: "10" },
   ]);
 
   const normalized = useMemo(
     () =>
       packages.map((p) => ({
-        weight: Number(p.weight) || 0,
-        length: Number(p.length) || 0,
-        width: Number(p.width) || 0,
-        height: Number(p.height) || 0,
+        weight: parseNum(p.weight) ?? 0,
+        length: parseNum(p.length) ?? 0,
+        width: parseNum(p.width) ?? 0,
+        height: parseNum(p.height) ?? 0,
       })),
     [packages]
   );
 
+  const isReady = useMemo(() => {
+    return (
+      postalCode.length === 5 &&
+      packages.every((p) =>
+        [p.weight, p.length, p.width, p.height].every((v) => v.trim() !== "" && (parseNum(v) ?? 0) > 0)
+      )
+    );
+  }, [postalCode, packages]);
+
   const total = useMemo(() => totalWeight(normalized), [normalized]);
 
   const results = useMemo(() => {
-    const ready =
-      postalCode.length === 5 &&
-      normalized.every((p) => p.weight > 0 && p.length > 0 && p.width > 0 && p.height > 0);
-
-    if (!ready) return null;
+    if (!isReady) return null;
 
     const multi = calcOSMulti(normalized, postalCode, cod);
 
@@ -691,18 +864,22 @@ export default function App() {
         : null;
 
     return { economy, express, overallWinner };
-  }, [postalCode, normalized, cod]);
+  }, [postalCode, normalized, cod, isReady]);
 
-  const updatePackage = (index: number, field: keyof PackageItem, value: number) => {
+  const updatePackage = (index: number, field: keyof PackageItem, value: string) => {
     setPackages((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
   };
 
   const addPackage = () => {
-    setPackages((prev) => [...prev, { weight: 1, length: 20, width: 20, height: 10 }]);
+    setPackages((prev) => [...prev, { weight: "", length: "", width: "", height: "" }]);
   };
 
   const duplicatePackage = (index: number) => {
-    setPackages((prev) => [...prev.slice(0, index + 1), { ...prev[index] }, ...prev.slice(index + 1)]);
+    setPackages((prev) => [
+      ...prev.slice(0, index + 1),
+      { ...prev[index] },
+      ...prev.slice(index + 1),
+    ]);
   };
 
   const removePackage = (index: number) => {
@@ -712,7 +889,11 @@ export default function App() {
   const resetShipment = () => {
     setPostalCode("");
     setCod(false);
-    setPackages([{ weight: 2, length: 30, width: 20, height: 10 }]);
+    setPackages([{ weight: "2", length: "30", width: "20", height: "10" }]);
+  };
+
+  const commonInputProps = {
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
   };
 
   return (
@@ -738,7 +919,9 @@ export default function App() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
-              <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 900, lineHeight: 1.1 }}>MBE kalkulator HR</div>
+              <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 900, lineHeight: 1.1 }}>
+                MBE kalkulator HR
+              </div>
             </div>
             <div style={{ color: "#64748b", marginTop: 6 }}>Mail Boxes Etc. Križevci</div>
           </div>
@@ -756,6 +939,7 @@ export default function App() {
               <div>
                 <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>Poštanski broj</label>
                 <input
+                  {...commonInputProps}
                   inputMode="numeric"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
@@ -770,41 +954,48 @@ export default function App() {
                   <div>
                     <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
                     <input
+                      {...commonInputProps}
                       inputMode="decimal"
-                      type="number"
-                      step="0.01"
+                      type="text"
                       value={packages[0]?.weight ?? ""}
-                      onChange={(e) => updatePackage(0, "weight", Number(e.target.value))}
+                      onChange={(e) => updatePackage(0, "weight", e.target.value)}
+                      placeholder="npr. 2"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
                     <input
-                      inputMode="numeric"
-                      type="number"
+                      {...commonInputProps}
+                      inputMode="decimal"
+                      type="text"
                       value={packages[0]?.length ?? ""}
-                      onChange={(e) => updatePackage(0, "length", Number(e.target.value))}
+                      onChange={(e) => updatePackage(0, "length", e.target.value)}
+                      placeholder="npr. 30"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
                     <input
-                      inputMode="numeric"
-                      type="number"
+                      {...commonInputProps}
+                      inputMode="decimal"
+                      type="text"
                       value={packages[0]?.width ?? ""}
-                      onChange={(e) => updatePackage(0, "width", Number(e.target.value))}
+                      onChange={(e) => updatePackage(0, "width", e.target.value)}
+                      placeholder="npr. 20"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
                     <input
-                      inputMode="numeric"
-                      type="number"
+                      {...commonInputProps}
+                      inputMode="decimal"
+                      type="text"
                       value={packages[0]?.height ?? ""}
-                      onChange={(e) => updatePackage(0, "height", Number(e.target.value))}
+                      onChange={(e) => updatePackage(0, "height", e.target.value)}
+                      placeholder="npr. 10"
                       style={inputStyle()}
                     />
                   </div>
@@ -819,7 +1010,16 @@ export default function App() {
 
             <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #e5e7eb" }} />
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <h3 style={{ margin: 0 }}>Paketi</h3>
               <button style={buttonStyle(true)} onClick={addPackage}>Dodaj paket</button>
             </div>
@@ -827,7 +1027,16 @@ export default function App() {
             <div style={{ display: "grid", gap: 12 }}>
               {packages.map((pkg, index) => (
                 <div key={index} style={{ ...cardStyle(), padding: 14 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 10,
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <strong>Paket {index + 1}</strong>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button style={buttonStyle()} onClick={() => duplicatePackage(index)}>Dupliciraj</button>
@@ -841,41 +1050,48 @@ export default function App() {
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
                       <input
+                        {...commonInputProps}
                         inputMode="decimal"
-                        type="number"
-                        step="0.01"
+                        type="text"
                         value={pkg.weight}
-                        onChange={(e) => updatePackage(index, "weight", Number(e.target.value))}
+                        onChange={(e) => updatePackage(index, "weight", e.target.value)}
+                        placeholder="npr. 2"
                         style={inputStyle()}
                       />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
                       <input
-                        inputMode="numeric"
-                        type="number"
+                        {...commonInputProps}
+                        inputMode="decimal"
+                        type="text"
                         value={pkg.length}
-                        onChange={(e) => updatePackage(index, "length", Number(e.target.value))}
+                        onChange={(e) => updatePackage(index, "length", e.target.value)}
+                        placeholder="npr. 30"
                         style={inputStyle()}
                       />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
                       <input
-                        inputMode="numeric"
-                        type="number"
+                        {...commonInputProps}
+                        inputMode="decimal"
+                        type="text"
                         value={pkg.width}
-                        onChange={(e) => updatePackage(index, "width", Number(e.target.value))}
+                        onChange={(e) => updatePackage(index, "width", e.target.value)}
+                        placeholder="npr. 20"
                         style={inputStyle()}
                       />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
                       <input
-                        inputMode="numeric"
-                        type="number"
+                        {...commonInputProps}
+                        inputMode="decimal"
+                        type="text"
                         value={pkg.height}
-                        onChange={(e) => updatePackage(index, "height", Number(e.target.value))}
+                        onChange={(e) => updatePackage(index, "height", e.target.value)}
+                        placeholder="npr. 10"
                         style={inputStyle()}
                       />
                     </div>
@@ -887,21 +1103,23 @@ export default function App() {
 
           <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
             <div style={cardStyle(!!results?.overallWinner)}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Preporuka</div>
+              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+                Preporuka
+              </div>
               {results?.overallWinner ? (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
                     <CarrierPill name={results.overallWinner.name} />
-                    <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>{results.overallWinner.name}</div>
+                    <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>
+                      {results.overallWinner.name}
+                    </div>
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <span style={serviceBadgeStyle(results.overallWinner.serviceType)}>
                       {results.overallWinner.serviceType}
                     </span>
+                    {statusBadge(results.overallWinner.status)}
                     <span style={badgeStyle("info")}>Najpovoljnija opcija</span>
-                    {results.overallWinner.manualCheck ? (
-                      <span style={badgeStyle("warn")}>Ručna provjera</span>
-                    ) : null}
                   </div>
                   <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
                     {money(results.overallWinner.price)}
@@ -921,7 +1139,9 @@ export default function App() {
             </div>
 
             <div style={cardStyle()}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>MBE Express</div>
+              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+                MBE Express
+              </div>
               {results ? (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
@@ -930,12 +1150,22 @@ export default function App() {
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <span style={serviceBadgeStyle(results.express.serviceType)}>{results.express.serviceType}</span>
+                    {statusBadge(results.express.status)}
                     {results.express.name === results.overallWinner?.name && results.express.possible ? (
                       <span style={badgeStyle("info")}>Preporuka</span>
                     ) : null}
                   </div>
-                  <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>{money(results.express.price)}</div>
-                  <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>{results.express.details.join(" · ")}</div>
+                  <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
+                    {money(results.express.price)}
+                  </div>
+                  <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
+                    {results.express.details.join(" · ")}
+                  </div>
+                  {results.express.warning ? (
+                    <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
+                      PAZI: {results.express.warning}
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div style={{ color: "#64748b", marginTop: 8 }}>Upiši sve podatke pošiljke.</div>
@@ -943,7 +1173,9 @@ export default function App() {
             </div>
 
             <div style={cardStyle()}>
-              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Brzi status</div>
+              <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+                Brzi status
+              </div>
               <div style={{ marginTop: 10, display: "grid", gap: 8, color: "#475569" }}>
                 <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
                 <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
