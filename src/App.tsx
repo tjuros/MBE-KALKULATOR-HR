@@ -387,10 +387,13 @@ function calcHP(
   cod: boolean
 ): PriceResult {
   const reasons: string[] = [];
+
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
     const longest = Math.max(p.length, p.width, p.height);
     const sum = p.length + p.width + p.height;
+
+    if (p.weight > 30) reasons.push(`Paket ${i + 1}: masa > 30 kg`);
     if (longest > 60) reasons.push(`Paket ${i + 1}: najduža stranica > 60 cm`);
     if (sum > 180) reasons.push(`Paket ${i + 1}: zbroj stranica > 180 cm`);
   }
@@ -407,9 +410,20 @@ function calcHP(
   }
 
   const kg = totalWeight(items);
-  let price = tierPrice(HP_TABLE, kg);
-  if (price === null) price = 5.45 + Math.ceil((kg - 30) / 5) * 1;
-  if (cod) price += 0.5;
+  const priceBase = tierPrice(HP_TABLE, kg);
+
+  if (priceBase === null) {
+    return {
+      name: "HP",
+      price: null,
+      possible: false,
+      details: ["Pošiljka prelazi podržani HP cjenik"],
+      serviceType: "MBE Economy",
+      status: "no",
+    };
+  }
+
+  const price = cod ? priceBase + 0.5 : priceBase;
 
   return {
     name: "HP",
@@ -444,12 +458,12 @@ function calcGLS(
     const oversize = p.length > 200 || p.width > 80 || p.height > 60 || girth(p) > 300;
     const overweight = p.weight > 40;
 
-    if (oversize && !reasons.length) {
+    if (oversize) {
       oversizeSurcharge += 5.39;
       warnings.push(`Paket ${i + 1}: paket prekomjernih dimenzija +5,39 €`);
     }
 
-    if (overweight && !reasons.length) {
+    if (overweight) {
       overweightSurcharge += 2.06;
       warnings.push(`Paket ${i + 1}: paket prekomjerne težine +2,06 €`);
     }
