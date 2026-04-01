@@ -1021,7 +1021,7 @@ export default function App() {
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
               <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 900, lineHeight: 1.1 }}>
-                MBE kalkulator HR
+                MBE SmartChoice
               </div>
             </div>
             <div style={{ color: "#64748b", marginTop: 6 }}>Mail Boxes Etc. Križevci</div>
