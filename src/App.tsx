@@ -15,16 +15,6 @@ type PriceResult = {
   serviceType: "MBE Economy" | "MBE Express";
 };
 
-const LOGOS: Record<string, string> = {
-  MBE: "https://www.mbe.hr/wp-content/uploads/2020/04/mbe-logo.png",
-  HP: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Hrvatska_po%C5%A1ta_logo.svg/512px-Hrvatska_po%C5%A1ta_logo.svg.png",
-  DPD: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/DPD_logo.svg/512px-DPD_logo.svg.png",
-  GLS: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/GLS_Logo.svg/512px-GLS_Logo.svg.png",
-  "Overseas Single": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
-  "Overseas Multi": "https://www.overseas.hr/wp-content/uploads/2020/10/overseas-logo.png",
-  InTime: "https://www.in-time.hr/images/logo.png",
-};
-
 const SMALL_ISLANDS = new Set([
   "20221", "20222", "20223", "20224", "20225", "20226", "20290",
   "21225",
@@ -253,6 +243,7 @@ function inputStyle(): React.CSSProperties {
     width: "100%",
     boxSizing: "border-box",
     fontFamily: "inherit",
+    background: "#fff",
   };
 }
 
@@ -275,13 +266,14 @@ function cardStyle(highlight = false): React.CSSProperties {
     background: highlight ? "#f0fdf4" : "#fff",
     borderRadius: 14,
     padding: 16,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
   };
 }
 
 function badgeStyle(type: "ok" | "warn" | "info"): React.CSSProperties {
   const styles = {
     ok: { background: "#dcfce7", color: "#166534" },
-    warn: { background: "#ffedd5", color: "#9a3412" },
+    warn: { background: "#fee2e2", color: "#991b1b" },
     info: { background: "#e0f2fe", color: "#075985" },
   };
   return {
@@ -292,6 +284,72 @@ function badgeStyle(type: "ok" | "warn" | "info"): React.CSSProperties {
     fontWeight: 700,
     ...styles[type],
   };
+}
+
+function serviceBadgeStyle(serviceType: "MBE Economy" | "MBE Express"): React.CSSProperties {
+  if (serviceType === "MBE Economy") {
+    return {
+      display: "inline-block",
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 800,
+      background: "#16a34a",
+      color: "#ffffff",
+    };
+  }
+
+  return {
+    display: "inline-block",
+    padding: "4px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800,
+    background: "#dc2626",
+    color: "#ffffff",
+  };
+}
+
+function carrierPillStyle(name: string): React.CSSProperties {
+  const base: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "6px 12px",
+    borderRadius: 999,
+    fontWeight: 800,
+    fontSize: 14,
+    letterSpacing: 0.2,
+    border: "1px solid transparent",
+    minHeight: 34,
+  };
+
+  switch (name) {
+    case "GLS":
+      return { ...base, background: "#0b4ea2", color: "#ffd400" };
+    case "InTime":
+      return { ...base, background: "#16a34a", color: "#111111" };
+    case "HP":
+      return { ...base, background: "#ffd400", color: "#111111" };
+    case "Overseas Single":
+    case "Overseas Multi":
+      return { ...base, background: "#f97316", color: "#ffffff" };
+    case "DPD":
+      return { ...base, background: "#dc2626", color: "#ffffff" };
+    case "MBE":
+      return { ...base, background: "#111111", color: "#ffffff" };
+    default:
+      return { ...base, background: "#e5e7eb", color: "#111827" };
+  }
+}
+
+function CarrierPill({ name }: { name: string }) {
+  const label =
+    name === "Overseas Single" ? "Overseas Single" :
+    name === "Overseas Multi" ? "Overseas Multi" :
+    name;
+
+  return <div style={carrierPillStyle(name)}>{label}</div>;
 }
 
 function calcHP(items: PackageItem[], cod: boolean): PriceResult {
@@ -503,18 +561,12 @@ function ResultRow({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {LOGOS[result.name] ? (
-              <img
-                src={LOGOS[result.name]}
-                alt={result.name}
-                style={{ height: 24, width: "auto", objectFit: "contain" }}
-              />
-            ) : null}
+            <CarrierPill name={result.name} />
             <div style={{ fontWeight: 700, fontSize: 20 }}>{result.name}</div>
           </div>
 
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={badgeStyle(result.serviceType === "MBE Express" ? "warn" : "ok")}>
+            <span style={serviceBadgeStyle(result.serviceType)}>
               {result.serviceType}
             </span>
             <span style={badgeStyle(result.possible ? "ok" : "warn")}>
@@ -560,10 +612,11 @@ export default function App() {
     if (!ready) return null;
 
     const multi = calcOSMulti(normalized, postalCode, cod);
+
     const economy = [
       calcDPD(normalized, postalCode),
       calcHP(normalized, cod),
-      calcOSSingle(normalized, postalCode, cod),
+      ...(normalized.length === 1 ? [calcOSSingle(normalized, postalCode, cod)] : []),
       calcInTime(normalized, postalCode),
       ...(multi ? [multi] : []),
     ].sort((a, b) => {
@@ -602,15 +655,6 @@ export default function App() {
     setPackages([{ weight: 2, length: 30, width: 20, height: 10 }]);
   };
 
-  const quickSet = (count: number) => {
-    const base = packages[0] || { weight: 1, length: 20, width: 20, height: 10 };
-    setPackages(Array.from({ length: count }, () => ({ ...base })));
-  };
-
-  const applyPreset = (preset: PackageItem) => {
-    setPackages((prev) => prev.map(() => ({ ...preset })));
-  };
-
   return (
     <div
       style={{
@@ -621,16 +665,27 @@ export default function App() {
       }}
     >
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gap: 16 }}>
-        <div style={{ ...cardStyle(), display: "flex", alignItems: "center", gap: 14 }}>
-          <img
-            src={LOGOS.MBE}
-            alt="Mail Boxes Etc."
-            style={{ height: 42, width: "auto", objectFit: "contain" }}
-          />
+        <div
+          style={{
+            ...cardStyle(),
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+          }}
+        >
           <div>
-            <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1 }}>Mail Boxes Etc.</div>
-            <div style={{ color: "#64748b", marginTop: 4 }}>MBE kalkulator HR</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
+              <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1 }}>MBE kalkulator HR</div>
+            </div>
+            <div style={{ color: "#64748b", marginTop: 6 }}>Mail Boxes Etc. Križevci</div>
           </div>
+
+          <button style={buttonStyle()} onClick={resetShipment}>
+            Reset
+          </button>
         </div>
 
         <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1.1fr 1fr" }}>
@@ -652,19 +707,6 @@ export default function App() {
                 <input type="checkbox" checked={cod} onChange={(e) => setCod(e.target.checked)} />
                 COD / pouzeće
               </label>
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={buttonStyle()} onClick={() => quickSet(1)}>1 paket</button>
-                <button style={buttonStyle()} onClick={() => quickSet(2)}>2 paketa</button>
-                <button style={buttonStyle()} onClick={() => quickSet(5)}>5 paketa</button>
-                <button style={buttonStyle()} onClick={resetShipment}>Reset</button>
-              </div>
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={buttonStyle()} onClick={() => applyPreset({ weight: 1, length: 20, width: 20, height: 10 })}>Mala kutija</button>
-                <button style={buttonStyle()} onClick={() => applyPreset({ weight: 3, length: 40, width: 30, height: 20 })}>Srednja</button>
-                <button style={buttonStyle()} onClick={() => applyPreset({ weight: 8, length: 60, width: 40, height: 40 })}>Velika</button>
-              </div>
             </div>
 
             <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #e5e7eb" }} />
@@ -690,19 +732,40 @@ export default function App() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
-                      <input type="number" step="0.01" value={pkg.weight} onChange={(e) => updatePackage(index, "weight", Number(e.target.value))} style={inputStyle()} />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={pkg.weight}
+                        onChange={(e) => updatePackage(index, "weight", Number(e.target.value))}
+                        style={inputStyle()}
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
-                      <input type="number" value={pkg.length} onChange={(e) => updatePackage(index, "length", Number(e.target.value))} style={inputStyle()} />
+                      <input
+                        type="number"
+                        value={pkg.length}
+                        onChange={(e) => updatePackage(index, "length", Number(e.target.value))}
+                        style={inputStyle()}
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
-                      <input type="number" value={pkg.width} onChange={(e) => updatePackage(index, "width", Number(e.target.value))} style={inputStyle()} />
+                      <input
+                        type="number"
+                        value={pkg.width}
+                        onChange={(e) => updatePackage(index, "width", Number(e.target.value))}
+                        style={inputStyle()}
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
-                      <input type="number" value={pkg.height} onChange={(e) => updatePackage(index, "height", Number(e.target.value))} style={inputStyle()} />
+                      <input
+                        type="number"
+                        value={pkg.height}
+                        onChange={(e) => updatePackage(index, "height", Number(e.target.value))}
+                        style={inputStyle()}
+                      />
                     </div>
                   </div>
                 </div>
@@ -716,13 +779,7 @@ export default function App() {
               {results?.economyWinner ? (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                    {LOGOS[results.economyWinner.name] ? (
-                      <img
-                        src={LOGOS[results.economyWinner.name]}
-                        alt={results.economyWinner.name}
-                        style={{ height: 26, width: "auto", objectFit: "contain" }}
-                      />
-                    ) : null}
+                    <CarrierPill name={results.economyWinner.name} />
                     <div style={{ fontSize: 30, fontWeight: 800 }}>{results.economyWinner.name}</div>
                   </div>
                   <div style={{ fontSize: 36, fontWeight: 900, marginTop: 8 }}>{money(results.economyWinner.price)}</div>
@@ -738,13 +795,7 @@ export default function App() {
               {results ? (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                    {LOGOS.GLS ? (
-                      <img
-                        src={LOGOS.GLS}
-                        alt="GLS"
-                        style={{ height: 26, width: "auto", objectFit: "contain" }}
-                      />
-                    ) : null}
+                    <CarrierPill name="GLS" />
                     <div style={{ fontSize: 30, fontWeight: 800 }}>GLS</div>
                   </div>
                   <div style={{ fontSize: 36, fontWeight: 900, marginTop: 8 }}>{money(results.express.price)}</div>
@@ -762,6 +813,7 @@ export default function App() {
                 <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
                 <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
                 <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
+                <div>Broj paketa: <strong>{packages.length}</strong></div>
               </div>
             </div>
           </div>
