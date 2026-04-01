@@ -2,8 +2,15 @@
 <html lang="hr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>MBE kalkulator HR</title>
+    <meta
+      name="description"
+      content="Mail Boxes Etc. Križevci - kalkulator dostave za HR kurire"
+    />
     <link rel="icon" href="https://www.mbe.hr/wp-content/uploads/2020/04/mbe-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,8 +18,40 @@
       href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        font-family: Ubuntu, Arial, sans-serif;
+        background: #f8fafc;
+        color: #111827;
+      }
+
+      input,
+      button,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button {
+        touch-action: manipulation;
+      }
+
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
-  <body style="margin:0; font-family: Ubuntu, Arial, sans-serif;">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
