@@ -372,14 +372,26 @@ function carrierPillStyle(name: string): React.CSSProperties {
   }
 }
 
-function CarrierPill({ name }: { name: string }) {
-  return <div style={carrierPillStyle(name)}>{name}</div>;
+function sectionSummaryStyle(): React.CSSProperties {
+  return {
+    cursor: "pointer",
+    fontWeight: 800,
+    listStyle: "none",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  };
 }
 
 function statusBadge(status: CarrierStatus) {
   if (status === "ok") return <span style={badgeStyle("ok")}>Moguće</span>;
   if (status === "surcharge") return <span style={badgeStyle("warn")}>Moguće uz nadoplatu</span>;
   return <span style={badgeStyle("danger")}>Nije moguće</span>;
+}
+
+function CarrierPill({ name }: { name: string }) {
+  return <div style={carrierPillStyle(name)}>{name}</div>;
 }
 
 function calcHP(
@@ -521,13 +533,8 @@ function calcDPD(
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
 
-    if (p.weight > 70) {
-      reasons.push(`Paket ${i + 1}: masa je previsoka za standardni DPD obračun`);
-    }
-
-    if (p.length > 220 || girth(p) > 360) {
-      reasons.push(`Paket ${i + 1}: dimenzije su previsoke za standardni DPD obračun`);
-    }
+    if (p.weight > 70) reasons.push(`Paket ${i + 1}: masa je previsoka za standardni DPD obračun`);
+    if (p.length > 220 || girth(p) > 360) reasons.push(`Paket ${i + 1}: dimenzije su previsoke za standardni DPD obračun`);
 
     const isOversize = p.length > 175 || girth(p) > 300;
     const overweightKg = Math.max(0, p.weight - 31.5);
@@ -557,12 +564,8 @@ function calcDPD(
 
   let price = 0;
 
-  if (items.length >= 2) {
-    price = items.length * 2.89;
-  } else {
-    const billedWeight = Math.min(items[0].weight, 31.5);
-    price = tierPrice(DPD_TABLE, billedWeight) || 0;
-  }
+  if (items.length >= 2) price = items.length * 2.89;
+  else price = tierPrice(DPD_TABLE, Math.min(items[0].weight, 31.5)) || 0;
 
   const details = [
     items.length >= 2 ? "2+ paketa: 2,89 € po paketu" : "Standardni cjenik",
@@ -643,7 +646,6 @@ function calcOSSingle(
   let price = base * 1.05;
   if (cod) price += 0.3;
   if (isOverseasSpecial(postal)) price *= 1.2;
-
   price += heavySurcharge + bulkySurcharge;
 
   const hasSurcharge = heavySurcharge > 0 || bulkySurcharge > 0;
@@ -710,15 +712,11 @@ function calcOSMulti(
 
   const kg = totalWeight(items);
   let base = tierPrice(OS_MULTI, kg);
-
-  if (base === null) {
-    base = 14.56 + Math.max(0, kg - 100) * 0.25;
-  }
+  if (base === null) base = 14.56 + Math.max(0, kg - 100) * 0.25;
 
   let price = base * 1.05;
   if (cod) price += 0.3;
   if (isOverseasSpecial(postal)) price *= 1.2;
-
   price += heavySurcharge + bulkySurcharge;
 
   const hasSurcharge = heavySurcharge > 0 || bulkySurcharge > 0;
@@ -816,119 +814,71 @@ function ResultRow({
   );
 }
 
-function ResultsBlock({
-  results,
-  postalCode,
-  total,
-  packagesCount,
-  isMobile,
+function CompactHero({
+  overallWinner,
+  express,
+  showExpress,
 }: {
-  results: { economy: PriceResult[]; express: PriceResult; overallWinner: PriceResult | null } | null;
-  postalCode: string;
-  total: number;
-  packagesCount: number;
-  isMobile: boolean;
+  overallWinner: PriceResult | null;
+  express: PriceResult | null;
+  showExpress: boolean;
 }) {
-  if (!results) return null;
-
   return (
-    <>
-      <div style={cardStyle(!!results.overallWinner)}>
-        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
+    <div style={{ display: "grid", gap: 12 }}>
+      <div style={cardStyle(!!overallWinner)}>
+        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 800 }}>
           Preporuka
         </div>
-        {results.overallWinner ? (
+        {overallWinner ? (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-              <CarrierPill name={results.overallWinner.name} />
-              <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>
-                {results.overallWinner.name}
-              </div>
+              <CarrierPill name={overallWinner.name} />
+              <div style={{ fontSize: 26, fontWeight: 900 }}>{overallWinner.name}</div>
             </div>
             <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <span style={serviceBadgeStyle(results.overallWinner.serviceType)}>
-                {results.overallWinner.serviceType}
-              </span>
-              {statusBadge(results.overallWinner.status)}
-              <span style={badgeStyle("info")}>Najpovoljnija opcija</span>
+              <span style={serviceBadgeStyle(overallWinner.serviceType)}>{overallWinner.serviceType}</span>
+              {statusBadge(overallWinner.status)}
             </div>
-            <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
-              {money(results.overallWinner.price)}
-            </div>
-            <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
-              {results.overallWinner.details.join(" · ")}
-            </div>
-            {results.overallWinner.warning ? (
-              <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
-                PAZI: {results.overallWinner.warning}
+            <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>{money(overallWinner.price)}</div>
+            {overallWinner.warning ? (
+              <div style={{ marginTop: 8, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
+                PAZI: {overallWinner.warning}
               </div>
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <div style={{ color: "#64748b", marginTop: 8 }}>Upiši poštanski broj i paket.</div>
+        )}
       </div>
 
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
-          MBE Express
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-          <CarrierPill name="GLS" />
-          <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800 }}>GLS</div>
-        </div>
-        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={serviceBadgeStyle(results.express.serviceType)}>{results.express.serviceType}</span>
-          {statusBadge(results.express.status)}
-          {results.express.name === results.overallWinner?.name && results.express.possible ? (
-            <span style={badgeStyle("info")}>Preporuka</span>
-          ) : null}
-        </div>
-        <div style={{ fontSize: isMobile ? 30 : 36, fontWeight: 900, marginTop: 8 }}>
-          {money(results.express.price)}
-        </div>
-        <div style={{ marginTop: 10, color: "#475569", lineHeight: 1.5 }}>
-          {results.express.details.join(" · ")}
-        </div>
-        {results.express.warning ? (
-          <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
-            PAZI: {results.express.warning}
+      {showExpress ? (
+        <div style={cardStyle(false)}>
+          <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 800 }}>
+            Express
           </div>
-        ) : null}
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>
-          Brzi status
+          {express ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                <CarrierPill name="GLS" />
+                <div style={{ fontSize: 24, fontWeight: 900 }}>GLS</div>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span style={serviceBadgeStyle(express.serviceType)}>{express.serviceType}</span>
+                {statusBadge(express.status)}
+              </div>
+              <div style={{ fontSize: 30, fontWeight: 900, marginTop: 8 }}>{money(express.price)}</div>
+              {express.warning ? (
+                <div style={{ marginTop: 8, color: "#9a3412", fontWeight: 700, lineHeight: 1.5 }}>
+                  PAZI: {express.warning}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div style={{ color: "#64748b", marginTop: 8 }}>Rezultat će se prikazati ovdje.</div>
+          )}
         </div>
-        <div style={{ marginTop: 10, display: "grid", gap: 8, color: "#475569" }}>
-          <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-          <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
-          <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
-          <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
-          <div>Broj paketa: <strong>{packagesCount}</strong></div>
-        </div>
-      </div>
-
-      <div>
-        <h2 style={{ marginBottom: 12 }}>Sve economy opcije</h2>
-        <div style={{ display: "grid", gap: 12 }}>
-          {results.economy.map((r) => (
-            <ResultRow
-              key={r.name}
-              result={r}
-              highlighted={r.name === results.overallWinner?.name}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h2 style={{ marginBottom: 12 }}>Express opcija</h2>
-        <ResultRow
-          result={results.express}
-          highlighted={results.express.name === results.overallWinner?.name}
-        />
-      </div>
-    </>
+      ) : null}
+    </div>
   );
 }
 
@@ -1037,7 +987,7 @@ export default function App() {
         fontFamily: "Ubuntu, Arial, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gap: 16 }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 14 }}>
         <div
           style={{
             ...cardStyle(),
@@ -1058,18 +1008,14 @@ export default function App() {
             <div style={{ color: "#64748b", marginTop: 6 }}>Mail Boxes Etc. Križevci</div>
           </div>
 
-          <button style={buttonStyle()} onClick={resetShipment}>
-            Reset
-          </button>
+          <button style={buttonStyle()} onClick={resetShipment}>Reset</button>
         </div>
 
-        <div style={{ display: "grid", gap: 16, gridTemplateColumns: isMobile ? "1fr" : "1.1fr 1fr" }}>
+        <div style={{ display: "grid", gap: 14, gridTemplateColumns: isMobile ? "1fr" : "1.05fr 0.95fr" }}>
           <div style={cardStyle()}>
-            <h2 style={{ marginTop: 0, marginBottom: 14 }}>Unos pošiljke</h2>
-
             <div style={{ display: "grid", gap: 12 }}>
               <div>
-                <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>Poštanski broj</label>
+                <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Poštanski broj</label>
                 <input
                   {...commonInputProps}
                   inputMode="numeric"
@@ -1080,131 +1026,92 @@ export default function App() {
                 />
               </div>
 
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ fontWeight: 700 }}>Paket 1</div>
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>Paket 1</div>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))", gap: 10 }}>
                   <div>
-                    <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
+                    <label style={{ display: "block", marginBottom: 6 }}>Težina</label>
                     <input
                       {...commonInputProps}
                       inputMode="decimal"
                       type="text"
                       value={packages[0]?.weight ?? ""}
                       onChange={(e) => updatePackage(0, "weight", e.target.value)}
-                      placeholder="npr. 2"
+                      placeholder="kg"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
+                    <label style={{ display: "block", marginBottom: 6 }}>Duljina</label>
                     <input
                       {...commonInputProps}
                       inputMode="decimal"
                       type="text"
                       value={packages[0]?.length ?? ""}
                       onChange={(e) => updatePackage(0, "length", e.target.value)}
-                      placeholder="npr. 30"
+                      placeholder="cm"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
+                    <label style={{ display: "block", marginBottom: 6 }}>Širina</label>
                     <input
                       {...commonInputProps}
                       inputMode="decimal"
                       type="text"
                       value={packages[0]?.width ?? ""}
                       onChange={(e) => updatePackage(0, "width", e.target.value)}
-                      placeholder="npr. 20"
+                      placeholder="cm"
                       style={inputStyle()}
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
+                    <label style={{ display: "block", marginBottom: 6 }}>Visina</label>
                     <input
                       {...commonInputProps}
                       inputMode="decimal"
                       type="text"
                       value={packages[0]?.height ?? ""}
                       onChange={(e) => updatePackage(0, "height", e.target.value)}
-                      placeholder="npr. 10"
+                      placeholder="cm"
                       style={inputStyle()}
                     />
                   </div>
                 </div>
               </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 16, marginTop: 2 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 16 }}>
                 <input type="checkbox" checked={cod} onChange={(e) => setCod(e.target.checked)} />
                 COD / pouzeće
               </label>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={buttonStyle()} onClick={() => duplicatePackage(0)}>
-                  Dupliciraj paket 1
-                </button>
-                <button style={buttonStyle(true)} onClick={addPackage}>
-                  Dodaj paket
-                </button>
+                <button style={buttonStyle()} onClick={() => duplicatePackage(0)}>Dupliciraj paket 1</button>
+                <button style={buttonStyle(true)} onClick={addPackage}>Dodaj paket</button>
               </div>
             </div>
           </div>
 
-          {!isMobile ? (
-            <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
-              <ResultsBlock
-                results={results}
-                postalCode={postalCode}
-                total={total}
-                packagesCount={packages.length}
-                isMobile={isMobile}
-              />
-            </div>
-          ) : null}
+          <CompactHero
+            overallWinner={results?.overallWinner ?? null}
+            express={results?.express ?? null}
+            showExpress={true}
+          />
         </div>
 
-        {isMobile ? (
-          <ResultsBlock
-            results={results}
-            postalCode={postalCode}
-            total={total}
-            packagesCount={packages.length}
-            isMobile={isMobile}
-          />
-        ) : null}
+        <details open={additionalPackages.length > 0} style={cardStyle()}>
+          <summary style={sectionSummaryStyle()}>
+            <span>Dodatni paketi {additionalPackages.length > 0 ? `(${additionalPackages.length})` : ""}</span>
+            <span style={{ color: "#64748b", fontWeight: 700 }}>{additionalPackages.length > 0 ? "otvori / zatvori" : "nema"}</span>
+          </summary>
 
-        {additionalPackages.length > 0 ? (
-          <div style={cardStyle()}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <h3 style={{ margin: 0 }}>Dodatni paketi</h3>
-              <button style={buttonStyle(true)} onClick={addPackage}>Dodaj paket</button>
-            </div>
-
-            <div style={{ display: "grid", gap: 12 }}>
+          {additionalPackages.length > 0 ? (
+            <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
               {additionalPackages.map((pkg, localIndex) => {
                 const index = localIndex + 1;
-
                 return (
                   <div key={index} style={{ ...cardStyle(), padding: 14 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 10,
-                        gap: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                       <strong>Paket {index + 1}</strong>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button style={buttonStyle()} onClick={() => duplicatePackage(index)}>Dupliciraj</button>
@@ -1212,52 +1119,52 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))", gap: 10 }}>
                       <div>
-                        <label style={{ display: "block", marginBottom: 6 }}>Težina (kg)</label>
+                        <label style={{ display: "block", marginBottom: 6 }}>Težina</label>
                         <input
                           {...commonInputProps}
                           inputMode="decimal"
                           type="text"
                           value={pkg.weight}
                           onChange={(e) => updatePackage(index, "weight", e.target.value)}
-                          placeholder="npr. 2"
+                          placeholder="kg"
                           style={inputStyle()}
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: 6 }}>Duljina (cm)</label>
+                        <label style={{ display: "block", marginBottom: 6 }}>Duljina</label>
                         <input
                           {...commonInputProps}
                           inputMode="decimal"
                           type="text"
                           value={pkg.length}
                           onChange={(e) => updatePackage(index, "length", e.target.value)}
-                          placeholder="npr. 30"
+                          placeholder="cm"
                           style={inputStyle()}
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: 6 }}>Širina (cm)</label>
+                        <label style={{ display: "block", marginBottom: 6 }}>Širina</label>
                         <input
                           {...commonInputProps}
                           inputMode="decimal"
                           type="text"
                           value={pkg.width}
                           onChange={(e) => updatePackage(index, "width", e.target.value)}
-                          placeholder="npr. 20"
+                          placeholder="cm"
                           style={inputStyle()}
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: 6 }}>Visina (cm)</label>
+                        <label style={{ display: "block", marginBottom: 6 }}>Visina</label>
                         <input
                           {...commonInputProps}
                           inputMode="decimal"
                           type="text"
                           value={pkg.height}
                           onChange={(e) => updatePackage(index, "height", e.target.value)}
-                          placeholder="npr. 10"
+                          placeholder="cm"
                           style={inputStyle()}
                         />
                       </div>
@@ -1266,8 +1173,46 @@ export default function App() {
                 );
               })}
             </div>
+          ) : (
+            <div style={{ marginTop: 12, color: "#64748b" }}>Za više od jednog paketa klikni “Dodaj paket”.</div>
+          )}
+        </details>
+
+        <details style={cardStyle()} open>
+          <summary style={sectionSummaryStyle()}>
+            <span>Sve economy opcije</span>
+            <span style={{ color: "#64748b", fontWeight: 700 }}>{results ? `${results.economy.length} opcija` : "čeka unos"}</span>
+          </summary>
+
+          {results ? (
+            <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+              {results.economy.map((r) => (
+                <ResultRow
+                  key={r.name}
+                  result={r}
+                  highlighted={r.name === results.overallWinner?.name}
+                />
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, color: "#64748b" }}>Upiši poštanski broj i sve dimenzije paketa.</div>
+          )}
+        </details>
+
+        <details style={cardStyle()}>
+          <summary style={sectionSummaryStyle()}>
+            <span>Brzi status</span>
+            <span style={{ color: "#64748b", fontWeight: 700 }}>{postalCode ? postalCode : "—"}</span>
+          </summary>
+
+          <div style={{ marginTop: 12, display: "grid", gap: 8, color: "#475569" }}>
+            <div>Otok: <strong>{postalCode ? (isIsland(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
+            <div>Overseas posebna zona: <strong>{postalCode ? (isOverseasSpecial(postalCode) ? "Da" : "Ne") : "-"}</strong></div>
+            <div>InTime zona: <strong>{postalCode.length === 5 ? `Z${getInTimeZone(postalCode)}` : "-"}</strong></div>
+            <div>Ukupna težina: <strong>{total.toFixed(2)} kg</strong></div>
+            <div>Broj paketa: <strong>{packages.length}</strong></div>
           </div>
-        ) : null}
+        </details>
       </div>
     </div>
   );
