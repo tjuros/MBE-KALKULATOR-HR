@@ -163,8 +163,6 @@ const OVERSEAS_ZONE2 = new Set([
   "20235",
 ]);
 
-// GLS otoci bez posebne otočne cijene 19,46 €
-// Ovdje su poštanski brojevi koje si ranije koristio i koji odgovaraju navedenim otocima.
 const GLS_SELF_SERVED_ISLANDS = new Set([
   "51500",
   "51511",
@@ -173,8 +171,8 @@ const GLS_SELF_SERVED_ISLANDS = new Set([
   "51514",
   "51515",
   "51516",
-  "51517", // Krk
-  "51280", // Rab
+  "51517",
+  "51280",
   "51550",
   "51551",
   "51552",
@@ -182,28 +180,28 @@ const GLS_SELF_SERVED_ISLANDS = new Set([
   "51555",
   "51557",
   "51561",
-  "51562", // Cres / Lošinj
-  "23234", // Vir
-  "23250", // Pag
-  "53291", // Pag
+  "51562",
+  "23234",
+  "23250",
+  "53291",
   "21220",
-  "21223", // Brač
-  "22243", // Murter
+  "21223",
+  "22243",
   "21400",
   "21420",
   "21450",
-  "21480", // Hvar / Vis
+  "21480",
   "20225",
   "20240",
   "20244",
   "20246",
-  "20250", // Korčula / Pelješac
+  "20250",
   "23262",
   "23263",
   "23264",
   "23273",
   "23274",
-  "23281", // Pašman / Ugljan
+  "23281",
 ]);
 
 const INTIME_ZONE_2 = new Set([
@@ -909,12 +907,11 @@ function calcGLS(
   }
 
   let price = basePrice * 1.19;
-  price += items.length * 0.04; // climate protect
+  price += items.length * 0.04;
   if (cod) price += 0.43;
   price += oversizeSurcharge + overweightSurcharge;
 
-  const hasSurcharge =
-    oversizeSurcharge > 0 || overweightSurcharge > 0 || specialIslandUsed;
+  const hasSurcharge = oversizeSurcharge > 0 || overweightSurcharge > 0 || specialIslandUsed;
 
   return {
     name: "GLS",
@@ -1018,8 +1015,7 @@ function calcDPD(
     details.push(`Prekomjerna težina +${overweightSurcharge.toFixed(2)} €`);
   }
 
-  const hasSurcharge =
-    oversizeSurcharge > 0 || overweightSurcharge > 0 || DPD_ISLANDS.has(postal);
+  const hasSurcharge = oversizeSurcharge > 0 || overweightSurcharge > 0 || DPD_ISLANDS.has(postal);
 
   return {
     name: "DPD",
@@ -1211,10 +1207,7 @@ function calcInTime(
   }
 
   const needsManualCheck = items.some(
-    (p) =>
-      p.weight > 600 ||
-      p.length > 250 ||
-      (p.length > 120 && p.width > 80 && p.height > 170)
+    (p) => p.weight > 600 || p.length > 250 || (p.length > 120 && p.width > 80 && p.height > 170)
   );
 
   return {
@@ -1343,9 +1336,7 @@ export default function App() {
   const [postalCode, setPostalCode] = useState("");
   const [cod, setCod] = useState(false);
   const [codAmount, setCodAmount] = useState("");
-  const [packages, setPackages] = useState<PackageItem[]>([
-    { weight: "2", length: "30", width: "20", height: "10" },
-  ]);
+  const [packages, setPackages] = useState<PackageItem[]>([{ weight: "2", length: "30", width: "20", height: "10" }]);
 
   const normalized = useMemo(
     () =>
@@ -1428,23 +1419,21 @@ export default function App() {
     return [...new Set(surchargeDetails)];
   }, [results]);
 
+  const surchargeCarriers = useMemo(() => {
+    if (!results) return [];
+    return [...results.economy, results.express].filter((r) => r.status === "surcharge").map((r) => r.name);
+  }, [results]);
+
   const updatePackage = (index: number, field: keyof PackageItem, value: string) => {
     setPackages((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
   };
 
   const addPackage = () => {
-    setPackages((prev) => [
-      ...prev,
-      { weight: "1", length: "10", width: "10", height: "10" },
-    ]);
+    setPackages((prev) => [...prev, { weight: "1", length: "10", width: "10", height: "10" }]);
   };
 
   const duplicatePackage = (index: number) => {
-    setPackages((prev) => [
-      ...prev.slice(0, index + 1),
-      { ...prev[index] },
-      ...prev.slice(index + 1),
-    ]);
+    setPackages((prev) => [...prev.slice(0, index + 1), { ...prev[index] }, ...prev.slice(index + 1)]);
   };
 
   const removePackage = (index: number) => {
@@ -1785,9 +1774,6 @@ export default function App() {
                 Poštanski broj: <strong>{postalCode || "-"}</strong>
               </div>
               <div>
-                Broj paketa: <strong>{packages.length}</strong>
-              </div>
-              <div>
                 Pošiljka: <strong>{packages.length === 1 ? "1 paket" : `${packages.length} paketa`}</strong>
               </div>
               <div>
@@ -1800,25 +1786,15 @@ export default function App() {
                 COD: <strong>{cod ? `Da${codAmount ? ` (${codAmount} €)` : ""}` : "Ne"}</strong>
               </div>
               <div>
-                Nestandardno:{" "}
-                <strong>
-                  {results
-                    ? [...results.economy, results.express].some((r) => r.status === "surcharge")
-                      ? "Da"
-                      : "Ne"
-                    : "-"}
-                </strong>
+                Nestandardno: <strong>{results ? (surchargeCarriers.length ? surchargeCarriers.join(" · ") : "Ne") : "-"}</strong>
               </div>
               <div>
-                Nadoplate:{" "}
-                <strong>{results ? (reviewSurcharges.length ? reviewSurcharges.join(" · ") : "Nema") : "-"}</strong>
+                Nadoplate: <strong>{results ? (reviewSurcharges.length ? reviewSurcharges.join(" · ") : "Nema") : "-"}</strong>
               </div>
               <div>
                 Najpovoljnija opcija:{" "}
                 <strong>
-                  {results?.overallWinner
-                    ? `${results.overallWinner.name} (${money(results.overallWinner.price)})`
-                    : "-"}
+                  {results?.overallWinner ? `${results.overallWinner.name} (${money(results.overallWinner.price)})` : "-"}
                 </strong>
               </div>
             </div>
