@@ -1744,6 +1744,28 @@ export default function App() {
             </div>
           )}
         </details>
+
+        <details style={cardStyle()} open>
+          <summary style={sectionSummaryStyle()}>
+            <span>Express opcija</span>
+            <span style={{ color: "#64748b", fontWeight: 700 }}>
+              {results ? "1 opcija" : "čeka unos"}
+            </span>
+          </summary>
+
+          {results ? (
+            <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+              <ResultRow
+                result={results.express}
+                highlighted={results.express.name === results.overallWinner?.name}
+              />
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, color: "#64748b" }}>
+              Upiši poštanski broj, sve dimenzije paketa i COD iznos ako je pouzeće uključeno.
+            </div>
+          )}
+        </details>
       </div>
 
       <div
