@@ -463,7 +463,7 @@ function calcGLS(items: NumericPackageItem[], postal: string, cod: boolean): Pri
   if (reasons.length) return fail("GLS", "MBE Express", reasons);
 
   let price = items.reduce((sum, p) => sum + (tierPrice(table, Math.min(p.weight, 40)) || 0), 0);
-  price = price * 1.19 + (cod ? 0.43 : 0) + oversize + overweight;
+  price = price * 1.19 * 1.13 + (cod ? 0.43 : 0) + oversize + overweight;
 
   const hasSurcharge = oversize > 0 || overweight > 0;
 
