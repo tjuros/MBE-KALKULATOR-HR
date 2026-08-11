@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { calculatePrices, type NumericPackageItem, type PricingInput, type PricingResults } from "../src/pricing";
+
+const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling: false };
+const box = (weight: number, length: number, width: number, height: number): NumericPackageItem => ({ weight, length, width, height });
+const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
+  postalCode: "10000",
+  destinationPlace: "",
+  packages: [box(1, 10, 10, 10)],
+  cod: false,
+  codAmount: 0,
+  shippingDate: "2026-08-11",
+  additionalServices: noExtras,
+  ...overrides,
+});
+
+const find = (results: PricingResults, id: string) => {
+  const result = [...results.economy, ...results.express, ...results.lockers].find((item) => item.id === id);
+  assert.ok(result, `Missing result ${id}`);
+  return result;
+};
+
+const price = (results: PricingResults, id: string, expected: number) => {
+  const result = find(results, id);
+  assert.equal(result.possible, true, `${id} should be possible: ${result.warning ?? ""}`);
+  assert.equal(result.price, expected, `${id} price`);
+};
+
+const virovitica = calculatePrices(shipment({
+  postalCode: "33000",
+  packages: [box(12, 60, 60, 40), box(12, 60, 60, 40)],
+}));
+price(virovitica, "hp-paket24", 5.45);
+price(virovitica, "overseas-multi", 5.72);
+price(virovitica, "dpd-standard", 6.58);
+price(virovitica, "gls-express", 10.58);
+price(virovitica, "lagermax", 30.91);
+price(virovitica, "intime", 43.01);
+assert.equal(find(virovitica, "box-now").possible, false);
+
+const korcula = calculatePrices(shipment({
+  postalCode: "20260",
+  packages: [box(12, 60, 60, 40), box(12, 60, 60, 40)],
+}));
+price(korcula, "hp-paket24", 5.45);
+price(korcula, "dpd-standard", 13.58);
+price(korcula, "gls-express", 10.58);
+price(korcula, "intime", 51.98);
+price(korcula, "lagermax", 62.64);
+assert.equal(find(korcula, "overseas-multi").possible, false, "Overseas Cargo is not available for 20260");
+
+const osijekCod = calculatePrices(shipment({
+  postalCode: "31000",
+  destinationPlace: "Osijek",
+  packages: [box(0.6, 30, 40, 5)],
+  cod: true,
+  codAmount: 40,
+}));
+price(osijekCod, "box-now", 1.8);
+price(osijekCod, "hp-paket24", 2.7);
+price(osijekCod, "dpd-standard", 2.79);
+price(osijekCod, "overseas-single", 3.07);
+price(osijekCod, "gls-express", 4.65);
+price(osijekCod, "intime", 5.49);
+
+const zagrebBulk = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: Array.from({ length: 18 }, () => box(12, 40, 40, 30)),
+}));
+price(zagrebBulk, "box-now", 25.2);
+price(zagrebBulk, "hp-paleta", 30.56);
+price(zagrebBulk, "hp-paket24", 41.8);
+price(zagrebBulk, "overseas-multi", 46.17);
+price(zagrebBulk, "dpd-standard", 59.22);
+price(zagrebBulk, "intime", 63.02);
+price(zagrebBulk, "gls-express", 88.14);
+price(zagrebBulk, "lagermax", 89.54);
+
+const unresolvedOsijek = calculatePrices(shipment({
+  postalCode: "31000",
+  destinationPlace: "",
+  packages: [box(1, 10, 10, 10)],
+}));
+assert.equal(find(unresolvedOsijek, "intime").status, "manual", "Ambiguous InTime zone must not be guessed");
+
+const intimeSeason = calculatePrices(shipment({
+  postalCode: "10000",
+  shippingDate: "2026-11-15",
+}));
+price(intimeSeason, "intime", 5.07);
+
+const ugljan = calculatePrices(shipment({ postalCode: "23273" }));
+price(ugljan, "dpd-standard", 6.29);
+price(ugljan, "lagermax", 20.36);
+
+const documentReturn = calculatePrices(shipment({
+  postalCode: "10000",
+  additionalServices: { ...noExtras, documentReturn: true },
+}));
+price(documentReturn, "gls-express", 6.62);
+
+console.log("Golden pricing scenarios: OK");
