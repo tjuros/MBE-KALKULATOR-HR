@@ -11,6 +11,7 @@ import {
   type PriceResult,
   type ServiceType,
 } from "./pricing";
+import { EXPORT_COUNTRIES } from "./exportTariffs";
 
 type PackageItem = {
   weight: string;
@@ -25,12 +26,6 @@ const DEFAULT_ADDITIONAL_SERVICES: AdditionalServices = {
   documentReturn: false,
   addresseeOnly: false,
   specialHandling: false,
-};
-
-const today = () => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 };
 
 const parseNum = (value: string) => {
@@ -94,15 +89,16 @@ const sectionSummaryStyle = (): CSSProperties => ({
   fontSize: 17,
 });
 
-const carrierColors: Record<string, { bg: string; color: string }> = {
+const carrierColors: Record<string, { bg: string; color: string; border?: string }> = {
   MBE: { bg: "#dc2626", color: "#fff" },
-  GLS: { bg: "#ffd100", color: "#062b5c" },
+  GLS: { bg: "#062b5c", color: "#ffd100", border: "#ffd100" },
   DPD: { bg: "#dc0032", color: "#fff" },
-  HP: { bg: "#f3c400", color: "#111827" },
+  HP: { bg: "#ffd500", color: "#111827", border: "#111827" },
   Overseas: { bg: "#ef7d00", color: "#fff" },
-  InTime: { bg: "#111827", color: "#fff" },
+  InTime: { bg: "#78be20", color: "#111827", border: "#111827" },
   Lagermax: { bg: "#e31b23", color: "#fff" },
-  "BOX NOW": { bg: "#7c3aed", color: "#fff" },
+  "BOX NOW": { bg: "#16a34a", color: "#fff" },
+  UPS: { bg: "#111827", color: "#ffb500", border: "#ffb500" },
 };
 
 const carrierPillStyle = (carrier: string): CSSProperties => {
@@ -114,6 +110,7 @@ const carrierPillStyle = (carrier: string): CSSProperties => {
     padding: "5px 9px",
     background: colors.bg,
     color: colors.color,
+    border: `1px solid ${colors.border ?? colors.bg}`,
     fontWeight: 900,
     fontSize: 12,
     letterSpacing: ".02em",
@@ -207,9 +204,10 @@ function ChoiceCard({ label, result }: { label: ServiceType; result: PriceResult
 
 export default function App() {
   const isMobile = useIsMobile();
+  const [destinationCountry, setDestinationCountry] = useState("Croatia");
   const [postalCode, setPostalCode] = useState("");
   const [destinationPlace, setDestinationPlace] = useState("");
-  const [shippingDate, setShippingDate] = useState(today);
+  const [goodsValue, setGoodsValue] = useState("");
   const [cod, setCod] = useState(false);
   const [codAmount, setCodAmount] = useState("");
   const [packages, setPackages] = useState<PackageItem[]>([{ ...DEFAULT_FIRST_PACKAGE }]);
@@ -222,22 +220,28 @@ export default function App() {
     height: parseNum(item.height) ?? 0,
   })), [packages]);
 
-  const isReady = useMemo(() => postalCode.length === 5
-    && Boolean(shippingDate)
+  const selectedExportCountry = useMemo(() => EXPORT_COUNTRIES.find((country) => country.value === destinationCountry), [destinationCountry]);
+  const isDomestic = destinationCountry === "Croatia";
+  const isWorldwide = selectedExportCountry?.region === "WW";
+  const destinationLabel = isDomestic ? "Hrvatska" : selectedExportCountry?.label ?? destinationCountry;
+
+  const isReady = useMemo(() => (!isDomestic || postalCode.length === 5)
+    && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
     && (!cod || (parseNum(codAmount) ?? 0) > 0)
     && packages.every((item) => [item.weight, item.length, item.width, item.height].every((value) => (parseNum(value) ?? 0) > 0)),
-  [postalCode, shippingDate, cod, codAmount, packages]);
+  [isDomestic, isWorldwide, postalCode, goodsValue, cod, codAmount, packages]);
 
   const placeOptions = useMemo(() => getPlaceOptions(postalCode), [postalCode]);
   const results = useMemo(() => isReady ? calculatePrices({
+    destinationCountry,
     postalCode,
     destinationPlace,
     packages: numericPackages,
     cod,
     codAmount: parseNum(codAmount) ?? 0,
-    shippingDate,
+    goodsValue: parseNum(goodsValue) ?? 0,
     additionalServices,
-  }) : null, [isReady, postalCode, destinationPlace, numericPackages, cod, codAmount, shippingDate, additionalServices]);
+  }) : null, [isReady, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue, additionalServices]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -253,9 +257,10 @@ export default function App() {
   ]);
   const removePackage = (index: number) => setPackages((current) => current.length === 1 ? current : current.filter((_, itemIndex) => itemIndex !== index));
   const resetShipment = () => {
+    setDestinationCountry("Croatia");
     setPostalCode("");
     setDestinationPlace("");
-    setShippingDate(today());
+    setGoodsValue("");
     setCod(false);
     setCodAmount("");
     setPackages([{ ...DEFAULT_FIRST_PACKAGE }]);
@@ -274,24 +279,44 @@ export default function App() {
                 <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
                 <div style={{ fontSize: isMobile ? 19 : 25, fontWeight: 900, lineHeight: 1.05 }}>SmartChoice</div>
               </div>
-              <div style={{ color: "#64748b", marginTop: 4, fontSize: isMobile ? 14 : 16 }}>Mail Boxes Etc. Križevci · domaća dostava</div>
+              <div style={{ color: "#64748b", marginTop: 4, fontSize: isMobile ? 14 : 16 }}>Mail Boxes Etc. Križevci · ulazne cijene bez PDV-a</div>
             </div>
             <button style={{ ...buttonStyle(), minHeight: 38, padding: "8px 12px" }} onClick={resetShipment}>Reset</button>
           </div>
         </header>
 
-        <div style={{ ...cardStyle(), display: "grid", gap: 8, padding: "12px 14px", background: "#fff" }}>
-          <strong>Križevci 48260 → odredište u Hrvatskoj</strong>
-          <div style={{ color: "#475569", lineHeight: 1.45 }}>
-            Sve cijene su ulazne i bez PDV-a. U cijenu su uključeni ugovoreni dodatci za gorivo; samo InTime koristi višu stvarnu ili volumensku masu.
-          </div>
-          <div style={{ color: "#64748b", fontSize: 12 }}>Tarifna konfiguracija: 11. 8. 2026. · Datum slanja aktivira InTime sezonski dodatak u studenome i prosincu.</div>
+        <div style={{ ...cardStyle(), padding: "12px 14px", background: "#fff" }}>
+          <label style={{ display: "block", marginBottom: 6, fontWeight: 900 }}>Destination country</label>
+          <select
+            value={destinationCountry}
+            onChange={(event) => {
+              setDestinationCountry(event.target.value);
+              setPostalCode("");
+              setDestinationPlace("");
+              setGoodsValue("");
+              setCod(false);
+              setCodAmount("");
+            }}
+            style={inputStyle()}
+          >
+            <option value="Croatia">Hrvatska</option>
+            <optgroup label="Europska unija">
+              {EXPORT_COUNTRIES.filter((country) => country.region === "EU").map((country) => (
+                <option key={country.value} value={country.value}>{country.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Ostale države s ugovorenim cijenama">
+              {EXPORT_COUNTRIES.filter((country) => country.region === "WW").map((country) => (
+                <option key={country.value} value={country.value}>{country.label}</option>
+              ))}
+            </optgroup>
+          </select>
         </div>
 
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: isMobile ? "1fr" : "1.05fr .95fr" }}>
           <section style={cardStyle()}>
             <div style={{ display: "grid", gap: 12 }}>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr .8fr", gap: 10 }}>
+              {isDomestic ? (
                 <div>
                   <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Poštanski broj odredišta</label>
                   <input
@@ -306,13 +331,17 @@ export default function App() {
                     style={inputStyle()}
                   />
                 </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Datum slanja</label>
-                  <input {...commonInputProps} type="date" value={shippingDate} onChange={(event) => setShippingDate(event.target.value)} style={inputStyle()} />
-                </div>
-              </div>
+              ) : null}
 
-              {postalCode.length === 5 && placeOptions.length ? (
+              {isWorldwide ? (
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Vrijednost robe (€)</label>
+                  <input {...commonInputProps} type="text" inputMode="decimal" value={goodsValue} onChange={(event) => setGoodsValue(event.target.value)} placeholder="bez PDV-a" style={inputStyle()} />
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Potrebno za točan obračun carinskih dodataka.</div>
+                </div>
+              ) : null}
+
+              {isDomestic && postalCode.length === 5 && placeOptions.length ? (
                 <div>
                   <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Točno mjesto <span style={{ color: "#dc2626" }}>(za pojedine zone)</span></label>
                   <input
@@ -375,7 +404,7 @@ export default function App() {
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
             <ChoiceCard label="MBE Economy" result={results?.economyWinner ?? null} />
             <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} />
-            <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} />
+            {isDomestic ? <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} /> : null}
           </div>
         </div>
 
@@ -407,7 +436,7 @@ export default function App() {
 
         <ResultSection title="Sve MBE Economy opcije" results={results?.economy ?? null} winner={results?.economyWinner ?? null} />
         <ResultSection title="Sve MBE Express opcije" results={results?.express ?? null} winner={results?.expressWinner ?? null} />
-        <ResultSection title="MBE Paketomati" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} />
+        {isDomestic ? <ResultSection title="MBE Paketomati" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
       </div>
 
       <div style={{ position: isMobile ? "fixed" : "sticky", left: 0, right: 0, bottom: 0, zIndex: 30, padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : 0, background: isMobile ? "rgba(248,250,252,.96)" : "transparent", backdropFilter: isMobile ? "blur(10px)" : "none", borderTop: isMobile ? "1px solid #e5e7eb" : "none", marginTop: 14 }}>
@@ -420,13 +449,14 @@ export default function App() {
               </span>
             </summary>
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
-              <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div>
-              <div>Datum slanja: <strong>{shippingDate || "—"}</strong></div>
+              <div>Država odredišta: <strong>{destinationLabel}</strong></div>
+              {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
+              {isWorldwide ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
               <div>Stvarna masa: <strong>{metrics.actualWeight.toFixed(2)} kg</strong></div>
-              <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div>
-              <div>InTime zona: <strong>{inTimeZone ? `Z${inTimeZone}` : postalCode ? "odaberi mjesto / provjeri" : "—"}</strong></div>
-              <div>Otok: <strong>{postalCode ? (destinationIsIsland(postalCode) ? "Da" : "Ne") : "—"}</strong></div>
+              {isDomestic ? <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div> : null}
+              {isDomestic ? <div>InTime zona: <strong>{inTimeZone ? `Z${inTimeZone}` : postalCode ? "odaberi mjesto / provjeri" : "—"}</strong></div> : null}
+              {isDomestic ? <div>Otok: <strong>{postalCode ? (destinationIsIsland(postalCode) ? "Da" : "Ne") : "—"}</strong></div> : null}
               <div>Najniži ulaz: <strong>{results?.overallWinner ? `${results.overallWinner.name} (${money(results.overallWinner.price)})` : "—"}</strong></div>
             </div>
           </details>
@@ -482,7 +512,7 @@ function ResultSection({ title, results, winner }: { title: string; results: Pri
         <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
           {results.map((result) => <ResultRow key={result.id} result={result} highlighted={result.id === winner?.id} />)}
         </div>
-      ) : <div style={{ marginTop: 12, color: "#64748b" }}>Upiši poštanski broj, datum i sve podatke o paketima.</div>}
+      ) : <div style={{ marginTop: 12, color: "#64748b" }}>Popuni sve obavezne podatke o odredištu i paketima.</div>}
     </details>
   );
 }

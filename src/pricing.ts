@@ -5,6 +5,7 @@ import {
   OVERSEAS_CARGO_BY_POSTAL,
   PLACE_OPTIONS_BY_POSTAL,
 } from "./destinationRules";
+import { EXPORT_TARIFFS, type ExportCountryTariff, type ExportTier } from "./exportTariffs";
 
 export type NumericPackageItem = {
   weight: number;
@@ -23,12 +24,13 @@ export type AdditionalServices = {
 };
 
 export type PricingInput = {
+  destinationCountry: string;
   postalCode: string;
   destinationPlace: string;
   packages: NumericPackageItem[];
   cod: boolean;
   codAmount: number;
-  shippingDate: string;
+  goodsValue: number;
   additionalServices: AdditionalServices;
 };
 
@@ -177,7 +179,7 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 const totalWeight = (items: NumericPackageItem[]) => items.reduce((sum, item) => sum + item.weight, 0);
 const totalVolume = (items: NumericPackageItem[]) => items.reduce((sum, item) => sum + item.length * item.width * item.height, 0);
 const volumeWeightInTime = (items: NumericPackageItem[]) => totalVolume(items) / 5000;
-const tierPrice = (table: Tier[], value: number) => table.find((tier) => value <= tier.max)?.price ?? null;
+const tierPrice = (table: readonly Tier[], value: number) => table.find((tier) => value <= tier.max)?.price ?? null;
 
 const normalizePlace = (value: string) => value
   .normalize("NFD")
@@ -336,12 +338,12 @@ export const calcGLS = (input: PricingInput): PriceResult => {
   }
 
   const fuel = 0.42 * packages.length;
-  const sms = 0.12;
+  const sms = 0.12 * packages.length;
   const codFee = input.cod ? 0.49 : 0;
   const details = [
     `${packages.length === 1 ? "single" : packages.length <= 4 ? "multi 2–4" : "multi 5+"}: ${base.toFixed(2)} €`,
     `gorivo ${packages.length} × 0,42 € = ${fuel.toFixed(2)} €`,
-    "SMS za cijelu pošiljku +0,12 €",
+    `SMS ${packages.length} × 0,12 € = ${sms.toFixed(2)} €`,
   ];
   if (special) details.push("GLS posebno dostavno područje");
   if (input.cod) details.push("COD +0,49 €");
@@ -589,8 +591,6 @@ export const calcInTime = (input: PricingInput): PriceResult => {
   const base = tierPrice(INTIME[zone], chargeable);
   if (base === null) return unavailable(id, "InTime", "InTime", serviceType, "Nema tarife za obračunsku masu.");
   const fuel = base * 0.15;
-  const month = Number(input.shippingDate.slice(5, 7));
-  const seasonal = month === 11 || month === 12 ? base * 0.15 : 0;
   const codFee = input.cod ? Math.max(1, input.codAmount * 0.01) : 0;
   const details = [
     `InTime zona ${zone}; obračunska masa ${chargeable.toFixed(2)} kg`,
@@ -598,9 +598,8 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     `osnovna tarifa ${base.toFixed(2)} €`,
     `fiksno gorivo 15% = ${fuel.toFixed(2)} €`,
   ];
-  if (seasonal) details.push(`sezonski dodatak 15% = ${seasonal.toFixed(2)} €`);
   if (input.cod) details.push(`COD 1%, min 1,00 € = ${codFee.toFixed(2)} €`);
-  const optional = addOptionalServices(base + fuel + seasonal + codFee, input, {
+  const optional = addOptionalServices(base + fuel + codFee, input, {
     documentReturn: 10,
     addresseeOnly: 2.55,
   }, details);
@@ -613,7 +612,7 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     possible: true,
     details,
     serviceType,
-    status: seasonal || input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
+    status: input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
     warning: zone === 3 ? "Moguća je dodatna naknada 8,00 € kada InTime koristi drugog pružatelja; popis tih odredišta nije dostavljen i iznos nije automatski dodan." : undefined,
   };
 };
@@ -642,8 +641,10 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   if (input.cod || Object.values(input.additionalServices).some(Boolean)) {
     return unavailable(id, "Lagermax", "Lagermax", serviceType, "COD i odabrane dodatne usluge nisu navedeni u Lagermax ponudi.");
   }
-  const zone = getLagermaxZone(input.postalCode);
-  if (!zone) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Odredište nije pokriveno dostavljenom Lagermax zonskom tablicom.", "manual");
+  const originZone = getLagermaxZone("48260");
+  const destinationZone = getLagermaxZone(input.postalCode);
+  if (!originZone || !destinationZone) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Polazište ili odredište nije pokriveno dostavljenom Lagermax zonskom tablicom.", "manual");
+  const zone = Math.max(originZone, destinationZone) as Zone;
   const anyIsland = isAnyIsland(input.postalCode);
   if (anyIsland && !LAGERMAX_DELIVERABLE_ISLANDS.has(input.postalCode)) {
     return unavailable(id, "Lagermax", "Lagermax", serviceType, "Otok nije naveden u Lagermax rasporedu dostave; Dugi otok nije pokriven.", "manual");
@@ -658,7 +659,8 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   const base = groups.reduce((sum, group) => sum + group.base, 0);
   const fuel = base * 0.066;
   const island = anyIsland ? base * 0.5 : 0;
-  const details = groups.map((group, index) => `pošiljka ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`);
+  const details = [`relacija Z${originZone} → Z${destinationZone}; primijenjena skuplja Z${zone}`];
+  details.push(...groups.map((group, index) => `pošiljka ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`));
   details.push(`gorivo 6,6% = ${fuel.toFixed(2)} €`);
   if (island) details.push(`otok 50% osnovne tarife = ${island.toFixed(2)} €`);
   return {
@@ -670,7 +672,6 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: "surcharge",
-    warning: "Ponuda navodi polazište 10000 Zagreb. Primjenu iste tarife za preuzimanje u Križevcima treba pisano potvrditi s Lagermaxom.",
   };
 };
 
@@ -712,6 +713,167 @@ export const calcBoxNow = (input: PricingInput): PriceResult => {
   };
 };
 
+const EXPORT_TARIFF_MAP = EXPORT_TARIFFS as Record<string, ExportCountryTariff>;
+const GLS_EXPORT_FUEL = 0.126;
+const GLS_EXPORT_SMS = 1.13;
+
+const exportBase = (table: readonly ExportTier[], packages: NumericPackageItem[], allowLastTierTo = 0) => {
+  let amount = 0;
+  for (const item of packages) {
+    let itemPrice = tierPrice(table, item.weight);
+    if (itemPrice === null && allowLastTierTo && item.weight <= allowLastTierTo) {
+      itemPrice = table.at(-1)?.price ?? null;
+    }
+    if (itemPrice === null) return null;
+    amount += itemPrice;
+  }
+  return amount;
+};
+
+const exportAddOnSelected = (input: PricingInput) => Object.values(input.additionalServices).some(Boolean);
+
+export const calcGLSExport = (input: PricingInput, tariff: ExportCountryTariff): PriceResult => {
+  const id = "gls-export";
+  const serviceType: ServiceType = "MBE Express";
+  if (!tariff.gls.length) return unavailable(id, "GLS Export", "GLS", serviceType, `GLS nema ulaznu tarifu za ${tariff.label}.`);
+  if (exportAddOnSelected(input)) {
+    return unavailable(id, "GLS Export", "GLS", serviceType, "Odabrane dodatne usluge nemaju ugovorenu izvoznu GLS cijenu.", "manual");
+  }
+  for (const item of input.packages) {
+    const size = dimensions(item);
+    if (item.weight > 40 || size.longest > 200 || size.girth > 300) {
+      return unavailable(id, "GLS Export", "GLS", serviceType, "GLS izvoz: najviše 40 kg, duljina 200 cm i opseg 300 cm po paketu.", "manual");
+    }
+  }
+  const codCountries = new Set(["Slovakia", "Romania", "Slovenia", "Hungary", "Czech Republic"]);
+  if (input.cod && !codCountries.has(input.destinationCountry)) {
+    return unavailable(id, "GLS Export", "GLS", serviceType, `GLS COD nije ugovoren za ${tariff.label}.`);
+  }
+  const base = exportBase(tariff.gls, input.packages);
+  if (base === null) return unavailable(id, "GLS Export", "GLS", serviceType, "Nema GLS izvozne tarife za unesenu težinu.");
+  const fuel = base * GLS_EXPORT_FUEL;
+  const sms = GLS_EXPORT_SMS * input.packages.length;
+  const codFee = input.cod ? 0.65 * input.packages.length : 0;
+  const customs = tariff.region === "WW" ? 33.18 : 0;
+  const details = [
+    `osnovna tarifa ${base.toFixed(2)} €`,
+    `gorivo 12,6% = ${fuel.toFixed(2)} €`,
+    `FlexDelivery e-mail + SMS ${input.packages.length} × 1,13 € = ${sms.toFixed(2)} €`,
+  ];
+  if (codFee) details.push(`COD ${input.packages.length} × 0,65 € = ${codFee.toFixed(2)} €`);
+  if (customs) details.push(`izvozno carinjenje DAP +${customs.toFixed(2)} €`);
+  return {
+    id,
+    name: "GLS Export",
+    carrier: "GLS",
+    price: round2(base + fuel + sms + codFee + customs),
+    possible: true,
+    details,
+    serviceType,
+    status: "surcharge",
+  };
+};
+
+const dpdExportCustoms = (input: PricingInput) => {
+  if (input.destinationCountry === "Great Britain") return 14.6 + Math.max(0, input.packages.length - 1) * 5.31;
+  if (input.destinationCountry === "Ukraine") return input.goodsValue <= 1000 ? 15.93 : 30.53;
+  if (["Bosnia and Herzegovina", "Serbia", "Switzerland", "Norway", "Liechtenstein"].includes(input.destinationCountry)) {
+    return input.goodsValue <= 1000 ? 0 : 40;
+  }
+  return 0;
+};
+
+export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff): PriceResult => {
+  const id = "dpd-export";
+  const serviceType: ServiceType = "MBE Economy";
+  if (!tariff.dpd.length) return unavailable(id, "DPD Export", "DPD", serviceType, `DPD nema ulaznu tarifu za ${tariff.label}.`);
+  for (const item of input.packages) {
+    const size = dimensions(item);
+    if (item.weight > 31.5 || size.longest > 175 || size.girth > 300) {
+      return unavailable(id, "DPD Export", "DPD", serviceType, "DPD izvoz: najviše 31,5 kg, duljina 175 cm i opseg 300 cm po paketu.", "manual");
+    }
+  }
+  const euCodRates: Record<string, number> = {
+    Slovenia: 0.5,
+    Hungary: 0.9,
+    "Czech Republic": 0.9,
+    Slovakia: 0.9,
+    Poland: 0.9,
+    Bulgaria: 0.9,
+    Romania: 0.9,
+  };
+  const codRate = euCodRates[input.destinationCountry];
+  if (input.cod && codRate === undefined) {
+    return unavailable(id, "DPD Export", "DPD", serviceType, `DPD COD nije ugovoren za ${tariff.label}.`);
+  }
+  const base = exportBase(tariff.dpd, input.packages, 31.5);
+  if (base === null) return unavailable(id, "DPD Export", "DPD", serviceType, "Nema DPD izvozne tarife za unesenu težinu.");
+  const fuel = 0.4 * input.packages.length;
+  const codFee = input.cod ? (codRate ?? 0) * input.packages.length : 0;
+  const customs = tariff.region === "WW" ? dpdExportCustoms(input) : 0;
+  const details = [
+    `osnovna tarifa ${base.toFixed(2)} €`,
+    `gorivo ${input.packages.length} × 0,40 € = ${fuel.toFixed(2)} €`,
+  ];
+  if (codFee) details.push(`COD ${input.packages.length} × ${codRate.toFixed(2)} € = ${codFee.toFixed(2)} €`);
+  if (customs) details.push(`izvozno carinjenje +${customs.toFixed(2)} €`);
+  const optional = addOptionalServices(base + fuel + codFee + customs, input, {
+    documentReturn: 1.83 * input.packages.length,
+    addresseeOnly: 1.83 * input.packages.length,
+    specialHandling: 8 * input.packages.length,
+  }, details);
+  if (optional.unsupported) return unavailable(id, "DPD Export", "DPD", serviceType, `DPD: ${optional.unsupported} nije ugovoreno.`);
+  return {
+    id,
+    name: "DPD Export",
+    carrier: "DPD",
+    price: round2(optional.amount),
+    possible: true,
+    details,
+    serviceType,
+    status: fuel || codFee || customs || exportAddOnSelected(input) ? "surcharge" : "ok",
+  };
+};
+
+export const calcHPExport = (input: PricingInput, tariff: ExportCountryTariff): PriceResult => {
+  const id = "hp-ems";
+  const serviceType: ServiceType = "MBE Economy";
+  if (!tariff.hp.length) return unavailable(id, "HP EMS", "HP", serviceType, `HP EMS nema ulaznu tarifu za ${tariff.label}.`);
+  if (input.cod) return unavailable(id, "HP EMS", "HP", serviceType, "Pouzeće nije ugovoreno za HP EMS.");
+  if (input.additionalServices.addresseeOnly) {
+    return unavailable(id, "HP EMS", "HP", serviceType, "Osobno uručenje nema ugovorenu HP EMS cijenu.", "manual");
+  }
+  for (const item of input.packages) {
+    const size = dimensions(item);
+    if (item.weight > 30 || size.longest > 150 || size.girth > 300) {
+      return unavailable(id, "HP EMS", "HP", serviceType, "HP EMS cjenik: najviše 30 kg, duljina 150 cm i opseg 300 cm po paketu.", "manual");
+    }
+  }
+  if (tariff.region === "WW" && input.goodsValue > 1000) {
+    return unavailable(id, "HP EMS", "HP", serviceType, "HP EMS carinski dodatak za vrijednost robe iznad 1.000 € nije naveden; potrebna je ručna provjera.", "manual");
+  }
+  const base = exportBase(tariff.hp, input.packages);
+  if (base === null) return unavailable(id, "HP EMS", "HP", serviceType, "Nema HP EMS tarife za unesenu težinu.");
+  const customs = tariff.region === "WW" ? (input.goodsValue <= 150 ? 1.97 : 3.93) : 0;
+  const details = [`osnovna EMS tarifa ${base.toFixed(2)} €`, "nema dodatka za gorivo"];
+  if (customs) details.push(`carinski dodatak +${customs.toFixed(2)} €`);
+  const optional = addOptionalServices(base + customs, input, {
+    documentReturn: 1.7 * input.packages.length,
+    specialHandling: 1.6 * input.packages.length,
+  }, details);
+  if (optional.unsupported) return unavailable(id, "HP EMS", "HP", serviceType, `HP EMS: ${optional.unsupported} nije ugovoreno.`, "manual");
+  return {
+    id,
+    name: "HP EMS",
+    carrier: "HP",
+    price: round2(optional.amount),
+    possible: true,
+    details,
+    serviceType,
+    status: customs || exportAddOnSelected(input) ? "surcharge" : "ok",
+  };
+};
+
 const sortResults = (results: PriceResult[]) => [...results].sort((a, b) => {
   if (a.possible !== b.possible) return a.possible ? -1 : 1;
   if (a.status !== b.status && !a.possible) return a.status === "manual" ? -1 : 1;
@@ -721,6 +883,35 @@ const sortResults = (results: PriceResult[]) => [...results].sort((a, b) => {
 const winner = (results: PriceResult[]) => results.find((result) => result.possible && result.price !== null) ?? null;
 
 export const calculatePrices = (input: PricingInput): PricingResults => {
+  if (input.destinationCountry !== "Croatia") {
+    const tariff = EXPORT_TARIFF_MAP[input.destinationCountry];
+    if (!tariff) {
+      const missing = unavailable("export-country", "Izvoz", "MBE", "MBE Economy", "Za odabranu državu nema ulaznih tarifa.");
+      return {
+        economy: [missing],
+        express: [],
+        lockers: [],
+        economyWinner: null,
+        expressWinner: null,
+        lockerWinner: null,
+        overallWinner: null,
+      };
+    }
+    const economy = sortResults([calcDPDExport(input, tariff), calcHPExport(input, tariff)]);
+    const express = sortResults([calcGLSExport(input, tariff)]);
+    const economyWinner = winner(economy);
+    const expressWinner = winner(express);
+    const overallWinner = winner(sortResults([...economy, ...express]));
+    return {
+      economy,
+      express,
+      lockers: [],
+      economyWinner,
+      expressWinner,
+      lockerWinner: null,
+      overallWinner,
+    };
+  }
   const economy = sortResults([
     calcDPD(input),
     calcHPParcel(input),
