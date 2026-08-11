@@ -54,6 +54,7 @@ export type PricingResults = {
   expressWinner: PriceResult | null;
   lockerWinner: PriceResult | null;
   overallWinner: PriceResult | null;
+  recommendedWinner: PriceResult | null;
 };
 
 type Tier = { max: number; price: number };
@@ -895,6 +896,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
         expressWinner: null,
         lockerWinner: null,
         overallWinner: null,
+        recommendedWinner: null,
       };
     }
     const economy = sortResults([calcDPDExport(input, tariff), calcHPExport(input, tariff), calcGLSExport(input, tariff)]);
@@ -910,6 +912,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
       expressWinner,
       lockerWinner: null,
       overallWinner,
+      recommendedWinner: economyWinner,
     };
   }
   const economy = sortResults([
@@ -926,7 +929,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
   const expressWinner = winner(express);
   const lockerWinner = winner(lockers);
   const overallWinner = winner(sortResults([...economy, ...express, ...lockers]));
-  return { economy, express, lockers, economyWinner, expressWinner, lockerWinner, overallWinner };
+  return { economy, express, lockers, economyWinner, expressWinner, lockerWinner, overallWinner, recommendedWinner: economyWinner };
 };
 
 export const shipmentMetrics = (packages: NumericPackageItem[]) => ({

@@ -64,6 +64,8 @@ price(osijekCod, "dpd-standard", 2.79);
 price(osijekCod, "overseas-single", 3.07);
 price(osijekCod, "gls-express", 4.65);
 price(osijekCod, "intime", 5.49);
+assert.equal(osijekCod.overallWinner?.id, "box-now", "BOX NOW remains the absolute cheapest transport option");
+assert.equal(osijekCod.recommendedWinner?.id, "hp-paket24", "Recommendation must stay within MBE Economy");
 
 const zagrebBulk = calculatePrices(shipment({
   postalCode: "10000",
@@ -106,6 +108,7 @@ price(austria, "hp-ems", 24);
 assert.equal(austria.lockers.length, 0, "Export must not offer parcel lockers");
 assert.equal(austria.express.length, 0, "Export Express is reserved for future UPS tariffs");
 assert.equal(find(austria, "gls-export").serviceType, "MBE Economy");
+assert.equal(austria.recommendedWinner?.id, "dpd-export");
 
 const greatBritain = calculatePrices(shipment({
   destinationCountry: "Great Britain",

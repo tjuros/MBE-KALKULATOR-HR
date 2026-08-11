@@ -157,7 +157,7 @@ function ResultRow({ result, highlighted }: { result: PriceResult; highlighted: 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={carrierPillStyle(result.carrier)}>{result.carrier}</span>
             <strong style={{ fontSize: 18 }}>{result.name}</strong>
-            {highlighted ? <span style={{ color: "#166534", fontWeight: 900, fontSize: 12 }}>NAJPOVOLJNIJE U GRUPI</span> : null}
+            {highlighted ? <span style={{ color: "#166534", fontWeight: 900, fontSize: 12 }}>{result.serviceType === "MBE Economy" ? "PREPORUČENO" : "NAJPOVOLJNIJE U GRUPI"}</span> : null}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             <span style={serviceBadgeStyle(result.serviceType)}>{result.serviceType}</span>
@@ -185,10 +185,18 @@ function ChoiceCard({ label, result }: { label: ServiceType; result: PriceResult
     "MBE Express": { border: "#dc2626", background: "#fef2f2", color: "#b91c1c" },
     "MBE Paketomati": { border: "#65a30d", background: "#f7fee7", color: "#3f6212" },
   };
+  const roles: Record<ServiceType, string> = {
+    "MBE Economy": "PREPORUKA",
+    "MBE Express": "BRŽA OPCIJA",
+    "MBE Paketomati": "DODATNA MOGUĆNOST",
+  };
   const accent = accents[label];
   return (
     <div style={{ ...cardStyle(Boolean(result)), padding: 14, borderColor: result ? accent.border : "#e5e7eb", background: result ? accent.background : "#fff" }}>
-      <div style={{ fontSize: 12, color: result ? accent.color : "#64748b", textTransform: "uppercase", fontWeight: 900 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: result ? accent.color : "#64748b", textTransform: "uppercase", fontWeight: 900 }}>{label}</div>
+        <span style={{ borderRadius: 999, padding: "3px 7px", background: result ? accent.border : "#e2e8f0", color: result ? "#fff" : "#64748b", fontSize: 10, fontWeight: 900, letterSpacing: ".03em" }}>{roles[label]}</span>
+      </div>
       {result ? (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 7 }}>
@@ -251,6 +259,7 @@ export default function App() {
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
+  const recommendation = results?.recommendedWinner ?? null;
 
   const updatePackage = (index: number, field: keyof PackageItem, value: string) => {
     setPackages((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
@@ -440,20 +449,35 @@ export default function App() {
           ) : <div style={{ marginTop: 12, color: "#64748b" }}>Za više paketa klikni “Dodaj paket”.</div>}
         </details>
 
-        <ResultSection title="Sve MBE Economy opcije" results={results?.economy ?? null} winner={results?.economyWinner ?? null} />
-        {isDomestic ? <ResultSection title="Sve MBE Express opcije" results={results?.express ?? null} winner={results?.expressWinner ?? null} /> : null}
-        {isDomestic ? <ResultSection title="MBE Paketomati" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
+        <ResultSection title="MBE Economy · usporedba kurira" results={results?.economy ?? null} winner={results?.economyWinner ?? null} defaultOpen />
+        {isDomestic ? <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} /> : null}
+        {isDomestic ? <ResultSection title="Paketomati · dodatna mogućnost" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
       </div>
 
       <div style={{ position: isMobile ? "fixed" : "sticky", left: 0, right: 0, bottom: 0, zIndex: 30, padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : 0, background: isMobile ? "rgba(248,250,252,.96)" : "transparent", backdropFilter: isMobile ? "blur(10px)" : "none", borderTop: isMobile ? "1px solid #e5e7eb" : "none", marginTop: 14 }}>
         <div style={{ maxWidth: 1040, margin: "0 auto" }}>
           <details style={cardStyle()}>
             <summary style={sectionSummaryStyle()}>
-              <span>Pregled pošiljke</span>
-              <span style={{ color: "#64748b", fontWeight: 800, display: "flex", alignItems: "center", gap: 8 }}>
-                <span>{results?.overallWinner ? money(results.overallWinner.price) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
+              <span style={{ display: "grid", gap: 2 }}>
+                <span>MBE Economy preporuka</span>
+                <span style={{ color: "#64748b", fontSize: 12, fontWeight: 700 }}>{recommendation ? recommendation.name : "Pregled pošiljke"}</span>
+              </span>
+              <span style={{ color: recommendation ? "#166534" : "#64748b", fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}>
+                <span>{recommendation ? money(recommendation.price) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
               </span>
             </summary>
+            {recommendation ? (
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: "1px solid #86efac", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ color: "#166534", fontSize: 11, fontWeight: 900, letterSpacing: ".04em" }}>PREPORUČENA MBE ECONOMY OPCIJA</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                    <span style={carrierPillStyle(recommendation.carrier)}>{recommendation.carrier}</span>
+                    <strong>{recommendation.name}</strong>
+                  </div>
+                </div>
+                <strong style={{ color: "#166534", fontSize: 24 }}>{money(recommendation.price)}</strong>
+              </div>
+            ) : null}
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
@@ -463,7 +487,8 @@ export default function App() {
               {isDomestic ? <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div> : null}
               {isDomestic ? <div>InTime zona: <strong>{inTimeZone ? `Z${inTimeZone}` : postalCode ? "odaberi mjesto / provjeri" : "—"}</strong></div> : null}
               {isDomestic ? <div>Otok: <strong>{postalCode ? (destinationIsIsland(postalCode) ? "Da" : "Ne") : "—"}</strong></div> : null}
-              <div>Najniži ulaz: <strong>{results?.overallWinner ? `${results.overallWinner.name} (${money(results.overallWinner.price)})` : "—"}</strong></div>
+              {isDomestic && results?.expressWinner ? <div>Brža opcija: <strong>{results.expressWinner.name} ({money(results.expressWinner.price)})</strong></div> : null}
+              {isDomestic && results?.lockerWinner ? <div>Paketomat, dodatno: <strong>{results.lockerWinner.name} ({money(results.lockerWinner.price)})</strong></div> : null}
             </div>
           </details>
         </div>
@@ -507,9 +532,19 @@ function PackageFields({
   );
 }
 
-function ResultSection({ title, results, winner }: { title: string; results: PriceResult[] | null; winner: PriceResult | null }) {
+function ResultSection({
+  title,
+  results,
+  winner,
+  defaultOpen = false,
+}: {
+  title: string;
+  results: PriceResult[] | null;
+  winner: PriceResult | null;
+  defaultOpen?: boolean;
+}) {
   return (
-    <details style={cardStyle()} open>
+    <details style={cardStyle()} open={defaultOpen}>
       <summary style={sectionSummaryStyle()}>
         <span>{title}</span>
         <span style={{ color: "#64748b", fontWeight: 700 }}>{results ? `${results.length} opcija` : "čeka unos"}</span>
