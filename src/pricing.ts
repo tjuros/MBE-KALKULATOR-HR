@@ -734,7 +734,7 @@ const exportAddOnSelected = (input: PricingInput) => Object.values(input.additio
 
 export const calcGLSExport = (input: PricingInput, tariff: ExportCountryTariff): PriceResult => {
   const id = "gls-export";
-  const serviceType: ServiceType = "MBE Express";
+  const serviceType: ServiceType = "MBE Economy";
   if (!tariff.gls.length) return unavailable(id, "GLS Export", "GLS", serviceType, `GLS nema ulaznu tarifu za ${tariff.label}.`);
   if (exportAddOnSelected(input)) {
     return unavailable(id, "GLS Export", "GLS", serviceType, "Odabrane dodatne usluge nemaju ugovorenu izvoznu GLS cijenu.", "manual");
@@ -897,8 +897,8 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
         overallWinner: null,
       };
     }
-    const economy = sortResults([calcDPDExport(input, tariff), calcHPExport(input, tariff)]);
-    const express = sortResults([calcGLSExport(input, tariff)]);
+    const economy = sortResults([calcDPDExport(input, tariff), calcHPExport(input, tariff), calcGLSExport(input, tariff)]);
+    const express: PriceResult[] = [];
     const economyWinner = winner(economy);
     const expressWinner = winner(express);
     const overallWinner = winner(sortResults([...economy, ...express]));
