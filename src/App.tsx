@@ -119,9 +119,9 @@ const carrierPillStyle = (carrier: string): CSSProperties => {
 
 const serviceBadgeStyle = (serviceType: ServiceType): CSSProperties => {
   const styles: Record<ServiceType, { bg: string; color: string }> = {
-    "MBE Economy": { bg: "#e0f2fe", color: "#075985" },
-    "MBE Express": { bg: "#fee2e2", color: "#991b1b" },
-    "MBE Paketomati": { bg: "#ede9fe", color: "#5b21b6" },
+    "MBE Economy": { bg: "#dcfce7", color: "#166534" },
+    "MBE Express": { bg: "#fee2e2", color: "#b91c1c" },
+    "MBE Paketomati": { bg: "#ecfccb", color: "#3f6212" },
   };
   return {
     display: "inline-flex",
@@ -180,9 +180,15 @@ function ResultRow({ result, highlighted }: { result: PriceResult; highlighted: 
 }
 
 function ChoiceCard({ label, result }: { label: ServiceType; result: PriceResult | null }) {
+  const accents: Record<ServiceType, { border: string; background: string; color: string }> = {
+    "MBE Economy": { border: "#16a34a", background: "#f0fdf4", color: "#166534" },
+    "MBE Express": { border: "#dc2626", background: "#fef2f2", color: "#b91c1c" },
+    "MBE Paketomati": { border: "#65a30d", background: "#f7fee7", color: "#3f6212" },
+  };
+  const accent = accents[label];
   return (
-    <div style={{ ...cardStyle(Boolean(result)), padding: 14 }}>
-      <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", fontWeight: 900 }}>{label}</div>
+    <div style={{ ...cardStyle(Boolean(result)), padding: 14, borderColor: result ? accent.border : "#e5e7eb", background: result ? accent.background : "#fff" }}>
+      <div style={{ fontSize: 12, color: result ? accent.color : "#64748b", textTransform: "uppercase", fontWeight: 900 }}>{label}</div>
       {result ? (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 7 }}>
