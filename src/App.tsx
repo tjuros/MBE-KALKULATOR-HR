@@ -91,14 +91,14 @@ const sectionSummaryStyle = (): CSSProperties => ({
 
 const carrierColors: Record<string, { bg: string; color: string; border?: string }> = {
   MBE: { bg: "#dc2626", color: "#fff" },
-  GLS: { bg: "#062b5c", color: "#ffd100", border: "#ffd100" },
+  GLS: { bg: "#1026b3", color: "#ffd100", border: "#ffd100" },
   DPD: { bg: "#dc0032", color: "#fff" },
   HP: { bg: "#ffd500", color: "#111827", border: "#111827" },
   Overseas: { bg: "#ef7d00", color: "#fff" },
   InTime: { bg: "#78be20", color: "#111827", border: "#111827" },
-  Lagermax: { bg: "#e31b23", color: "#fff" },
-  "BOX NOW": { bg: "#16a34a", color: "#fff" },
-  UPS: { bg: "#111827", color: "#ffb500", border: "#ffb500" },
+  Lagermax: { bg: "#08377c", color: "#fff" },
+  "BOX NOW": { bg: "#44d62c", color: "#efefe6" },
+  UPS: { bg: "#351c15", color: "#ffb500", border: "#ffb500" },
 };
 
 const carrierPillStyle = (carrier: string): CSSProperties => {
