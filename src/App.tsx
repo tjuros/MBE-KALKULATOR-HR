@@ -403,7 +403,7 @@ export default function App() {
 
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
             <ChoiceCard label="MBE Economy" result={results?.economyWinner ?? null} />
-            <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} />
+            {isDomestic ? <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} /> : null}
             {isDomestic ? <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} /> : null}
           </div>
         </div>
@@ -435,7 +435,7 @@ export default function App() {
         </details>
 
         <ResultSection title="Sve MBE Economy opcije" results={results?.economy ?? null} winner={results?.economyWinner ?? null} />
-        <ResultSection title="Sve MBE Express opcije" results={results?.express ?? null} winner={results?.expressWinner ?? null} />
+        {isDomestic ? <ResultSection title="Sve MBE Express opcije" results={results?.express ?? null} winner={results?.expressWinner ?? null} /> : null}
         {isDomestic ? <ResultSection title="MBE Paketomati" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
       </div>
 

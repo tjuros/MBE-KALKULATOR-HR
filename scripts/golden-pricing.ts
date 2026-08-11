@@ -104,6 +104,8 @@ price(austria, "dpd-export", 5.44);
 price(austria, "gls-export", 7);
 price(austria, "hp-ems", 24);
 assert.equal(austria.lockers.length, 0, "Export must not offer parcel lockers");
+assert.equal(austria.express.length, 0, "Export Express is reserved for future UPS tariffs");
+assert.equal(find(austria, "gls-export").serviceType, "MBE Economy");
 
 const greatBritain = calculatePrices(shipment({
   destinationCountry: "Great Britain",
