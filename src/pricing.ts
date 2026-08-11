@@ -578,12 +578,11 @@ export const calcInTime = (input: PricingInput): PriceResult => {
   const serviceType: ServiceType = "MBE Economy";
   const zone = resolveInTimeZone(input.postalCode, input.destinationPlace);
   if (!zone) return unavailable(id, "InTime", "InTime", serviceType, "InTime zona nije jednoznačna; odaberi točno mjesto ili provjeri odredište.", "manual");
-  for (const item of input.packages) {
+  const nonStandardCount = input.packages.filter((item) => {
     const size = dimensions(item);
-    if (item.weight > 35 || !fitsDimensions(item, [135, 60, 60]) || size.girth > 375) {
-      return unavailable(id, "InTime", "InTime", serviceType, "Nestandardna InTime pošiljka zahtijeva prethodni dogovor; standard je 35 kg i 135 × 60 × 60 cm po koletu.", "manual");
-    }
-  }
+    return item.weight > 35 || !fitsDimensions(item, [135, 60, 60]) || size.girth > 375;
+  }).length;
+  const nonStandard = nonStandardCount > 0;
   if (input.cod && input.codAmount > 2500) return unavailable(id, "InTime", "InTime", serviceType, "Gotovinska otkupnina može biti najviše 2.500 €.");
   const actual = totalWeight(input.packages);
   const volumetric = volumeWeightInTime(input.packages);
@@ -592,6 +591,7 @@ export const calcInTime = (input: PricingInput): PriceResult => {
   const base = tierPrice(INTIME[zone], chargeable);
   if (base === null) return unavailable(id, "InTime", "InTime", serviceType, "Nema tarife za obračunsku masu.");
   const fuel = base * 0.15;
+  const nonStandardFee = nonStandard ? base : 0;
   const codFee = input.cod ? Math.max(1, input.codAmount * 0.01) : 0;
   const details = [
     `InTime zona ${zone}; obračunska masa ${chargeable.toFixed(2)} kg`,
@@ -599,12 +599,16 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     `osnovna tarifa ${base.toFixed(2)} €`,
     `fiksno gorivo 15% = ${fuel.toFixed(2)} €`,
   ];
+  if (nonStandard) details.push(`nestandardna pošiljka +100% osnovne cijene = ${nonStandardFee.toFixed(2)} € (${nonStandardCount} nestandardnih koleta)`);
   if (input.cod) details.push(`COD 1%, min 1,00 € = ${codFee.toFixed(2)} €`);
-  const optional = addOptionalServices(base + fuel + codFee, input, {
+  const optional = addOptionalServices(base + fuel + nonStandardFee + codFee, input, {
     documentReturn: 10,
     addresseeOnly: 2.55,
   }, details);
   if (optional.unsupported) return unavailable(id, "InTime", "InTime", serviceType, `InTime: ${optional.unsupported} nema izravno primjenjivu ugovorenu cijenu.`, "manual");
+  const warnings: string[] = [];
+  if (nonStandard) warnings.push("Procijenjeni obračun nestandardne pošiljke; prijevoz je moguć samo uz prethodni dogovor i potvrdu InTimea.");
+  if (zone === 3) warnings.push("Moguća je dodatna naknada 8,00 € kada InTime koristi drugog pružatelja; popis tih odredišta nije dostavljen i iznos nije automatski dodan.");
   return {
     id,
     name: "InTime",
@@ -613,8 +617,8 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     possible: true,
     details,
     serviceType,
-    status: input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
-    warning: zone === 3 ? "Moguća je dodatna naknada 8,00 € kada InTime koristi drugog pružatelja; popis tih odredišta nije dostavljen i iznos nije automatski dodan." : undefined,
+    status: nonStandard || input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
+    warning: warnings.length ? warnings.join(" ") : undefined,
   };
 };
 

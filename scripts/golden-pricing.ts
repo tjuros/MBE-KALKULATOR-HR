@@ -97,6 +97,16 @@ const documentReturn = calculatePrices(shipment({
 }));
 price(documentReturn, "gls-express", 6.62);
 
+const longInTimeShipment = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(10, 310, 10, 10)],
+}));
+price(longInTimeShipment, "intime", 11.98);
+assert.equal(find(longInTimeShipment, "intime").status, "surcharge");
+assert.match(find(longInTimeShipment, "intime").details.join(" "), /nestandardna pošiljka \+100%/);
+assert.match(find(longInTimeShipment, "intime").warning ?? "", /prethodni dogovor i potvrdu InTimea/);
+assert.equal(longInTimeShipment.recommendedWinner?.id, "intime");
+
 const austria = calculatePrices(shipment({
   destinationCountry: "Austria",
   postalCode: "",
