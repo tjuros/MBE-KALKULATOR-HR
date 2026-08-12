@@ -743,6 +743,21 @@ export const calcBoxNow = (input: PricingInput): PriceResult => {
 const EXPORT_TARIFF_MAP = EXPORT_TARIFFS as Record<string, ExportCountryTariff>;
 const GLS_EXPORT_FUEL = 0.126;
 const GLS_EXPORT_SMS = 1.13;
+const GLS_EXPORT_COD_COUNTRIES = new Set(["Slovakia", "Romania", "Slovenia", "Hungary", "Czech Republic"]);
+const DPD_EXPORT_COD_RATES: Record<string, number> = {
+  Slovenia: 0.5,
+  Hungary: 0.9,
+  "Czech Republic": 0.9,
+  Slovakia: 0.9,
+  Poland: 0.9,
+  Bulgaria: 0.9,
+  Romania: 0.9,
+};
+
+export const exportCodCarriers = (destinationCountry: string) => [
+  ...(GLS_EXPORT_COD_COUNTRIES.has(destinationCountry) ? ["GLS"] : []),
+  ...(DPD_EXPORT_COD_RATES[destinationCountry] !== undefined ? ["DPD"] : []),
+];
 
 const exportBase = (table: readonly ExportTier[], packages: NumericPackageItem[], allowLastTierTo = 0) => {
   let amount = 0;
@@ -772,8 +787,7 @@ export const calcGLSExport = (input: PricingInput, tariff: ExportCountryTariff):
       return unavailable(id, "GLS Export", "GLS", serviceType, "GLS izvoz: najviše 40 kg, duljina 200 cm i opseg 300 cm po paketu.", "manual");
     }
   }
-  const codCountries = new Set(["Slovakia", "Romania", "Slovenia", "Hungary", "Czech Republic"]);
-  if (input.cod && !codCountries.has(input.destinationCountry)) {
+  if (input.cod && !GLS_EXPORT_COD_COUNTRIES.has(input.destinationCountry)) {
     return unavailable(id, "GLS Export", "GLS", serviceType, `GLS COD nije ugovoren za ${tariff.label}.`);
   }
   const base = exportBase(tariff.gls, input.packages);
@@ -820,16 +834,7 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
       return unavailable(id, "DPD Export", "DPD", serviceType, "DPD izvoz: najviše 31,5 kg, duljina 175 cm i opseg 300 cm po paketu.", "manual");
     }
   }
-  const euCodRates: Record<string, number> = {
-    Slovenia: 0.5,
-    Hungary: 0.9,
-    "Czech Republic": 0.9,
-    Slovakia: 0.9,
-    Poland: 0.9,
-    Bulgaria: 0.9,
-    Romania: 0.9,
-  };
-  const codRate = euCodRates[input.destinationCountry];
+  const codRate = DPD_EXPORT_COD_RATES[input.destinationCountry];
   if (input.cod && codRate === undefined) {
     return unavailable(id, "DPD Export", "DPD", serviceType, `DPD COD nije ugovoren za ${tariff.label}.`);
   }

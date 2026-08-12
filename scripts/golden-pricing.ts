@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { calculatePrices, type NumericPackageItem, type PricingInput, type PricingResults } from "../src/pricing";
+import { calculatePrices, exportCodCarriers, type NumericPackageItem, type PricingInput, type PricingResults } from "../src/pricing";
 import { DESTINATION_COUNTRIES } from "../src/upsTariffs";
 
 const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling: false };
@@ -124,6 +124,9 @@ assert.equal(find(austria, "gls-export").serviceType, "MBE Economy");
 assert.equal(find(austria, "ups-standard").serviceType, "MBE Economy");
 assert.equal(find(austria, "ups-express-saver").serviceType, "MBE Express");
 assert.equal(austria.recommendedWinner?.id, "dpd-export");
+assert.deepEqual(exportCodCarriers("Austria"), []);
+assert.deepEqual(exportCodCarriers("Slovenia"), ["GLS", "DPD"]);
+assert.deepEqual(exportCodCarriers("Poland"), ["DPD"]);
 
 const greatBritain = calculatePrices(shipment({
   destinationCountry: "Great Britain",

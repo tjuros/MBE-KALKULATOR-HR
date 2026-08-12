@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type FocusEvent } fro
 import {
   calculatePrices,
   destinationIsIsland,
+  exportCodCarriers,
   getPlaceOptions,
   resolveInTimeZone,
   shipmentMetrics,
@@ -238,6 +239,15 @@ export default function App() {
   const isDomestic = destinationCountry === "Croatia";
   const isWorldwide = selectedExportCountry?.region === "WW";
   const destinationLabel = isDomestic ? "Hrvatska" : selectedExportCountry?.label ?? destinationCountry;
+  const exportCodOptions = useMemo(() => isDomestic ? [] : exportCodCarriers(destinationCountry), [isDomestic, destinationCountry]);
+  const codAvailable = isDomestic || exportCodOptions.length > 0;
+
+  useEffect(() => {
+    if (!codAvailable && cod) {
+      setCod(false);
+      setCodAmount("");
+    }
+  }, [codAvailable, cod]);
 
   const isReady = useMemo(() => (!isDomestic || postalCode.length === 5)
     && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
@@ -382,10 +392,17 @@ export default function App() {
                 <PackageFields item={packages[0]} index={0} isMobile={isMobile} updatePackage={updatePackage} commonInputProps={commonInputProps} />
               </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 16 }}>
-                <input type="checkbox" checked={cod} onChange={(event) => setCod(event.target.checked)} />
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 16, color: codAvailable ? "#111827" : "#94a3b8" }}>
+                <input type="checkbox" checked={cod} disabled={!codAvailable} onChange={(event) => setCod(event.target.checked)} />
                 COD / pouzeće
               </label>
+              {!isDomestic ? (
+                <div style={{ fontSize: 12, color: codAvailable ? "#64748b" : "#b91c1c", marginTop: -6 }}>
+                  {codAvailable
+                    ? `Izvozno pouzeće dostupno putem: ${exportCodOptions.join(" i ")}.`
+                    : `Pouzeće nije dostupno za ${destinationLabel}.`}
+                </div>
+              ) : null}
               {cod ? (
                 <div>
                   <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Iznos pouzeća (€)</label>
