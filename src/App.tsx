@@ -225,7 +225,6 @@ export default function App() {
   const [goodsValue, setGoodsValue] = useState("");
   const [cod, setCod] = useState(false);
   const [codAmount, setCodAmount] = useState("");
-  const [safeValue, setSafeValue] = useState(false);
   const [packages, setPackages] = useState<PackageItem[]>([{ ...DEFAULT_FIRST_PACKAGE }]);
 
   const numericPackages = useMemo<NumericPackageItem[]>(() => packages.map((item) => ({
@@ -250,10 +249,10 @@ export default function App() {
   }, [codAvailable, cod]);
 
   const isReady = useMemo(() => (!isDomestic || postalCode.length === 5)
-    && (!(isWorldwide || safeValue) || (parseNum(goodsValue) ?? 0) > 0)
+    && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
     && (!cod || (parseNum(codAmount) ?? 0) > 0)
     && packages.every((item) => [item.weight, item.length, item.width, item.height].every((value) => (parseNum(value) ?? 0) > 0)),
-  [isDomestic, isWorldwide, safeValue, postalCode, goodsValue, cod, codAmount, packages]);
+  [isDomestic, isWorldwide, postalCode, goodsValue, cod, codAmount, packages]);
 
   const placeOptions = useMemo(() => getPlaceOptions(postalCode), [postalCode]);
   const results = useMemo(() => isReady ? calculatePrices({
@@ -264,9 +263,8 @@ export default function App() {
     cod,
     codAmount: parseNum(codAmount) ?? 0,
     goodsValue: parseNum(goodsValue) ?? 0,
-    safeValue,
     additionalServices: DEFAULT_ADDITIONAL_SERVICES,
-  }) : null, [isReady, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue, safeValue]);
+  }) : null, [isReady, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -291,7 +289,6 @@ export default function App() {
     setGoodsValue("");
     setCod(false);
     setCodAmount("");
-    setSafeValue(false);
     setPackages([{ ...DEFAULT_FIRST_PACKAGE }]);
   };
   const commonInputProps = { onFocus: (event: FocusEvent<HTMLInputElement>) => event.target.select() };
@@ -324,7 +321,6 @@ export default function App() {
               setGoodsValue("");
               setCod(false);
               setCodAmount("");
-              setSafeValue(false);
             }}
             style={inputStyle()}
           >
@@ -362,24 +358,11 @@ export default function App() {
                 </div>
               ) : null}
 
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800 }}>
-                  <input type="checkbox" checked={safeValue} onChange={(event) => {
-                    setSafeValue(event.target.checked);
-                    if (!event.target.checked && !isWorldwide) setGoodsValue("");
-                  }} />
-                  MBE SafeValue
-                </label>
-                <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45, marginTop: 7 }}>
-                  Ulazna cijena 1,15% deklarirane vrijednosti, najmanje 5,50 €. Potrebne su fotografije robe i pakiranja, Risk Sheet i dokaz vrijednosti; vrijede podlimiti i isključenja.
-                </div>
-              </div>
-
-              {isWorldwide || safeValue ? (
+              {isWorldwide ? (
                 <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>{safeValue ? "Deklarirana vrijednost robe (€)" : "Vrijednost robe (€)"}</label>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Vrijednost robe (€)</label>
                   <input {...commonInputProps} type="text" inputMode="decimal" value={goodsValue} onChange={(event) => setGoodsValue(event.target.value)} placeholder="bez PDV-a" style={inputStyle()} />
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>{isWorldwide && safeValue ? "Potrebno za carinske dodatke i SafeValue pokriće." : isWorldwide ? "Potrebno za točan obračun carinskih dodataka." : "Osnovica za obračun MBE SafeValue pokrića."}</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Potrebno za točan obračun carinskih dodataka.</div>
                 </div>
               ) : null}
 
@@ -498,7 +481,7 @@ export default function App() {
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
-              {isWorldwide || safeValue ? <div>{safeValue ? "Deklarirana vrijednost" : "Vrijednost robe"}: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
+              {isWorldwide ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
               <div>Stvarna masa: <strong>{metrics.actualWeight.toFixed(2)} kg</strong></div>
               {isDomestic ? <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div> : null}
