@@ -11,7 +11,7 @@ import {
   type PriceResult,
   type ServiceType,
 } from "./pricing";
-import { EXPORT_COUNTRIES } from "./exportTariffs";
+import { DESTINATION_COUNTRIES } from "./upsTariffs";
 
 type PackageItem = {
   weight: string;
@@ -234,7 +234,7 @@ export default function App() {
     height: parseNum(item.height) ?? 0,
   })), [packages]);
 
-  const selectedExportCountry = useMemo(() => EXPORT_COUNTRIES.find((country) => country.value === destinationCountry), [destinationCountry]);
+  const selectedExportCountry = useMemo(() => DESTINATION_COUNTRIES.find((country) => country.value === destinationCountry), [destinationCountry]);
   const isDomestic = destinationCountry === "Croatia";
   const isWorldwide = selectedExportCountry?.region === "WW";
   const destinationLabel = isDomestic ? "Hrvatska" : selectedExportCountry?.label ?? destinationCountry;
@@ -259,7 +259,9 @@ export default function App() {
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
-  const recommendation = results?.recommendedWinner ?? null;
+  const economyRecommendation = results?.recommendedWinner ?? null;
+  const recommendation = economyRecommendation ?? results?.expressWinner ?? null;
+  const expressFallback = Boolean(recommendation && !economyRecommendation && recommendation.serviceType === "MBE Express");
 
   const updatePackage = (index: number, field: keyof PackageItem, value: string) => {
     setPackages((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
@@ -316,12 +318,12 @@ export default function App() {
           >
             <option value="Croatia">Hrvatska</option>
             <optgroup label="Europska unija">
-              {EXPORT_COUNTRIES.filter((country) => country.region === "EU").map((country) => (
+              {DESTINATION_COUNTRIES.filter((country) => country.region === "EU").map((country) => (
                 <option key={country.value} value={country.value}>{country.label}</option>
               ))}
             </optgroup>
             <optgroup label="Ostale države s ugovorenim cijenama">
-              {EXPORT_COUNTRIES.filter((country) => country.region === "WW").map((country) => (
+              {DESTINATION_COUNTRIES.filter((country) => country.region === "WW").map((country) => (
                 <option key={country.value} value={country.value}>{country.label}</option>
               ))}
             </optgroup>
@@ -418,7 +420,7 @@ export default function App() {
 
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
             <ChoiceCard label="MBE Economy" result={results?.economyWinner ?? null} />
-            {isDomestic ? <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} /> : null}
+            <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} />
             {isDomestic ? <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} /> : null}
           </div>
         </div>
@@ -450,7 +452,7 @@ export default function App() {
         </details>
 
         <ResultSection title="MBE Economy · usporedba kurira" results={results?.economy ?? null} winner={results?.economyWinner ?? null} defaultOpen />
-        {isDomestic ? <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} /> : null}
+        <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} />
         {isDomestic ? <ResultSection title="Paketomati · dodatna mogućnost" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
       </div>
 
@@ -459,23 +461,23 @@ export default function App() {
           <details style={cardStyle()}>
             <summary style={sectionSummaryStyle()}>
               <span style={{ display: "grid", gap: 2 }}>
-                <span>MBE Economy preporuka</span>
+                <span>{expressFallback ? "MBE Express opcija" : "MBE Economy preporuka"}</span>
                 <span style={{ color: "#64748b", fontSize: 12, fontWeight: 700 }}>{recommendation ? recommendation.name : "Pregled pošiljke"}</span>
               </span>
-              <span style={{ color: recommendation ? "#166534" : "#64748b", fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: recommendation ? (expressFallback ? "#b91c1c" : "#166534") : "#64748b", fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}>
                 <span>{recommendation ? money(recommendation.price) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
               </span>
             </summary>
             {recommendation ? (
-              <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: "1px solid #86efac", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `1px solid ${expressFallback ? "#fca5a5" : "#86efac"}`, background: expressFallback ? "#fef2f2" : "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ color: "#166534", fontSize: 11, fontWeight: 900, letterSpacing: ".04em" }}>PREPORUČENA MBE ECONOMY OPCIJA</div>
+                  <div style={{ color: expressFallback ? "#b91c1c" : "#166534", fontSize: 11, fontWeight: 900, letterSpacing: ".04em" }}>{expressFallback ? "DOSTUPNA MBE EXPRESS OPCIJA" : "PREPORUČENA MBE ECONOMY OPCIJA"}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                     <span style={carrierPillStyle(recommendation.carrier)}>{recommendation.carrier}</span>
                     <strong>{recommendation.name}</strong>
                   </div>
                 </div>
-                <strong style={{ color: "#166534", fontSize: 24 }}>{money(recommendation.price)}</strong>
+                <strong style={{ color: expressFallback ? "#b91c1c" : "#166534", fontSize: 24 }}>{money(recommendation.price)}</strong>
               </div>
             ) : null}
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
@@ -487,7 +489,7 @@ export default function App() {
               {isDomestic ? <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div> : null}
               {isDomestic ? <div>InTime zona: <strong>{inTimeZone ? `Z${inTimeZone}` : postalCode ? "odaberi mjesto / provjeri" : "—"}</strong></div> : null}
               {isDomestic ? <div>Otok: <strong>{postalCode ? (destinationIsIsland(postalCode) ? "Da" : "Ne") : "—"}</strong></div> : null}
-              {isDomestic && results?.expressWinner ? <div>Brža opcija: <strong>{results.expressWinner.name} ({money(results.expressWinner.price)})</strong></div> : null}
+              {results?.expressWinner ? <div>Brža opcija: <strong>{results.expressWinner.name} ({money(results.expressWinner.price)})</strong></div> : null}
               {isDomestic && results?.lockerWinner ? <div>Paketomat, dodatno: <strong>{results.lockerWinner.name} ({money(results.lockerWinner.price)})</strong></div> : null}
             </div>
           </details>

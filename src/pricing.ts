@@ -6,6 +6,28 @@ import {
   PLACE_OPTIONS_BY_POSTAL,
 } from "./destinationRules";
 import { EXPORT_TARIFFS, type ExportCountryTariff, type ExportTier } from "./exportTariffs";
+import {
+  UPS_ADDITIONAL_HANDLING,
+  UPS_BALKANS_SAVER_OVER_70,
+  UPS_BALKANS_SAVER_RATES,
+  UPS_EXPRESS_SAVER_FUEL,
+  UPS_EXPORT_CLEARANCE,
+  UPS_LARGE_PACKAGE,
+  UPS_NON_EXPRESS_CUSTOMS_BROKERAGE,
+  UPS_OVER_MAXIMUM,
+  UPS_REMOTE_MINIMUM,
+  UPS_REMOTE_RATE_PER_KG,
+  UPS_SAVER_OVER_70,
+  UPS_SAVER_PACKAGE_RATES,
+  UPS_STANDARD_FUEL,
+  UPS_STANDARD_MULTI_RATES,
+  UPS_STANDARD_OVER_100,
+  UPS_STANDARD_SINGLE_RATES,
+  getUpsCountry,
+  type UpsCountry,
+  type UpsOverWeightRate,
+  type UpsTier,
+} from "./upsTariffs";
 
 export type NumericPackageItem = {
   weight: number;
@@ -339,12 +361,12 @@ export const calcGLS = (input: PricingInput): PriceResult => {
   }
 
   const fuel = 0.42 * packages.length;
-  const sms = 0.12 * packages.length;
+  const sms = 0.12;
   const codFee = input.cod ? 0.49 : 0;
   const details = [
     `${packages.length === 1 ? "single" : packages.length <= 4 ? "multi 2–4" : "multi 5+"}: ${base.toFixed(2)} €`,
     `gorivo ${packages.length} × 0,42 € = ${fuel.toFixed(2)} €`,
-    `SMS ${packages.length} × 0,12 € = ${sms.toFixed(2)} €`,
+    `SMS po pošiljci = ${sms.toFixed(2)} €`,
   ];
   if (special) details.push("GLS posebno dostavno područje");
   if (input.cod) details.push("COD +0,49 €");
@@ -879,6 +901,190 @@ export const calcHPExport = (input: PricingInput, tariff: ExportCountryTariff): 
   };
 };
 
+type UpsPackageCharge = {
+  billableWeight: number;
+  dimensionalWeight: number;
+  large: boolean;
+  additionalHandling: boolean;
+};
+
+const roundUpHalfKg = (value: number) => Math.ceil((value - 1e-9) * 2) / 2;
+
+const upsPackageCharges = (input: PricingInput): UpsPackageCharge[] | PriceResult => {
+  const serviceType: ServiceType = "MBE Express";
+  for (const item of input.packages) {
+    const size = dimensions(item);
+    if (item.weight > 70 || size.longest > 274 || size.girth > 400) {
+      return unavailable(
+        "ups-limits",
+        "UPS",
+        "UPS",
+        serviceType,
+        `UPS paket prelazi maksimalno ograničenje (70 kg, duljina 274 cm ili duljina + opseg 400 cm). UPS ga standardno ne prihvaća; ako ipak uđe u sustav, cjenik navodi doplatu ${UPS_OVER_MAXIMUM.toFixed(2)} € po paketu.`,
+        "manual",
+      );
+    }
+  }
+
+  return input.packages.map((item) => {
+    const size = dimensions(item);
+    const dimensionalWeight = item.length * item.width * item.height / 5000;
+    const large = size.girth > 300;
+    const additionalHandling = !large && (item.weight > 25 || size.longest > 100 || size.middle > 76);
+    const billableWeight = Math.max(
+      roundUpHalfKg(Math.max(item.weight, dimensionalWeight)),
+      large ? 40 : 0,
+    );
+    return { billableWeight, dimensionalWeight, large, additionalHandling };
+  });
+};
+
+const upsTierPrice = (table: readonly UpsTier[], weight: number) => table.find((tier) => weight <= tier.max)?.price ?? null;
+
+const upsOverWeightPrice = (rate: UpsOverWeightRate, weight: number) => Math.max(rate.minimum, Math.ceil(weight - 1e-9) * rate.perKg);
+
+const upsUnavailableForSelections = (
+  input: PricingInput,
+  id: string,
+  name: string,
+  serviceType: ServiceType,
+) => {
+  if (input.cod) return unavailable(id, name, "UPS", serviceType, "UPS pouzeće nije navedeno u ugovorenom cjeniku.");
+  if (exportAddOnSelected(input)) {
+    return unavailable(id, name, "UPS", serviceType, "Odabrane dodatne usluge nemaju ugovorenu UPS cijenu; potrebna je ručna provjera.", "manual");
+  }
+  return null;
+};
+
+const upsWarnings = (country: UpsCountry, standard: boolean) => {
+  const warnings: string[] = [];
+  if (country.remotePossible) {
+    warnings.push(`Za pojedine poštanske brojeve moguća je proširena/udaljena lokacija: ${UPS_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, najmanje ${UPS_REMOTE_MINIMUM.toFixed(2)} € po pošiljci. Nije uključeno bez poštanskog broja odredišta.`);
+  }
+  if (country.region === "WW") {
+    warnings.push(standard
+      ? "Uključeni su izvozno carinjenje i ugovoreno posredovanje za non-Express pošiljku; PDV, carina i davanja u odredištu nisu uključeni."
+      : "Uključeno je izvozno carinjenje; PDV, carina, uvozne pristojbe i davanja u odredištu nisu uključeni.");
+  }
+  return warnings.join(" ") || undefined;
+};
+
+const upsChargeSummary = (charges: UpsPackageCharge[]) => ({
+  billableWeight: charges.reduce((sum, charge) => sum + charge.billableWeight, 0),
+  largeCount: charges.filter((charge) => charge.large).length,
+  handlingCount: charges.filter((charge) => charge.additionalHandling).length,
+});
+
+export const calcUPSStandard = (input: PricingInput, country: UpsCountry): PriceResult => {
+  const id = "ups-standard";
+  const name = "UPS Standard";
+  const serviceType: ServiceType = "MBE Economy";
+  if (country.suspended) return unavailable(id, name, "UPS", serviceType, `UPS usluga za ${country.label} privremeno je suspendirana.`);
+  if (country.standardZone === null) return unavailable(id, name, "UPS", serviceType, `UPS Standard nije dostupan za ${country.label}.`);
+  const selectionIssue = upsUnavailableForSelections(input, id, name, serviceType);
+  if (selectionIssue) return selectionIssue;
+
+  const chargeResult = upsPackageCharges(input);
+  if (!Array.isArray(chargeResult)) return { ...chargeResult, id, name, serviceType };
+  const { billableWeight, largeCount, handlingCount } = upsChargeSummary(chargeResult);
+  const zone = String(country.standardZone);
+  let transport: number | null;
+  let tariffLabel: string;
+  if (input.packages.length === 1) {
+    transport = upsTierPrice((UPS_STANDARD_SINGLE_RATES as Record<string, readonly UpsTier[]>)[zone], billableWeight);
+    tariffLabel = "jedan paket";
+  } else if (billableWeight <= 100) {
+    transport = upsTierPrice((UPS_STANDARD_MULTI_RATES as Record<string, readonly UpsTier[]>)[zone], billableWeight);
+    tariffLabel = "višepaketna pošiljka";
+  } else {
+    transport = upsOverWeightPrice((UPS_STANDARD_OVER_100 as Record<string, UpsOverWeightRate>)[zone], billableWeight);
+    tariffLabel = "višepaketna pošiljka iznad 100 kg";
+  }
+  if (transport === null) return unavailable(id, name, "UPS", serviceType, "Nema UPS Standard tarife za izračunatu obračunsku masu.", "manual");
+
+  const largeFee = largeCount * UPS_LARGE_PACKAGE;
+  const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
+  const fuelBasis = transport + largeFee + handlingFee;
+  const fuel = fuelBasis * UPS_STANDARD_FUEL;
+  const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
+  const nonExpressCustoms = country.region === "WW" ? UPS_NON_EXPRESS_CUSTOMS_BROKERAGE : 0;
+  const details = [
+    `zona ${country.standardZone}; ${tariffLabel}`,
+    `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
+    `osnovna tarifa ${transport.toFixed(2)} €`,
+  ];
+  if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
+  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
+  details.push(`gorivo 31,25% = ${fuel.toFixed(2)} €`);
+  if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
+  if (nonExpressCustoms) details.push(`carinsko posredovanje za non-Express +${nonExpressCustoms.toFixed(2)} €`);
+
+  return {
+    id,
+    name,
+    carrier: "UPS",
+    price: round2(fuelBasis + fuel + exportClearance + nonExpressCustoms),
+    possible: true,
+    details,
+    serviceType,
+    warning: upsWarnings(country, true),
+    status: "surcharge",
+  };
+};
+
+export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): PriceResult => {
+  const id = "ups-express-saver";
+  const name = "UPS Express Saver";
+  const serviceType: ServiceType = "MBE Express";
+  if (country.suspended) return unavailable(id, name, "UPS", serviceType, `UPS usluga za ${country.label} privremeno je suspendirana.`);
+  if (country.saverZone === null) return unavailable(id, name, "UPS", serviceType, `UPS Express Saver nije dostupan za ${country.label}.`);
+  const selectionIssue = upsUnavailableForSelections(input, id, name, serviceType);
+  if (selectionIssue) return selectionIssue;
+
+  const chargeResult = upsPackageCharges(input);
+  if (!Array.isArray(chargeResult)) return { ...chargeResult, id, name, serviceType };
+  const { billableWeight, largeCount, handlingCount } = upsChargeSummary(chargeResult);
+  const zone = String(country.saverZone);
+  const specialBalkans = country.specialSaver === "BALKANS";
+  const rateTable = specialBalkans
+    ? UPS_BALKANS_SAVER_RATES
+    : (UPS_SAVER_PACKAGE_RATES as Record<string, readonly UpsTier[]>)[zone];
+  const overWeightRate = specialBalkans
+    ? UPS_BALKANS_SAVER_OVER_70
+    : (UPS_SAVER_OVER_70 as Record<string, UpsOverWeightRate>)[zone];
+  const transport = billableWeight <= 70
+    ? upsTierPrice(rateTable, billableWeight)
+    : upsOverWeightPrice(overWeightRate, billableWeight);
+  if (transport === null) return unavailable(id, name, "UPS", serviceType, "Nema UPS Express Saver tarife za izračunatu obračunsku masu.", "manual");
+
+  const largeFee = largeCount * UPS_LARGE_PACKAGE;
+  const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
+  const fuelBasis = transport + largeFee + handlingFee;
+  const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;
+  const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
+  const details = [
+    specialBalkans ? "posebni Express Saver cjenik za BiH / Sjevernu Makedoniju / Albaniju" : `zona ${country.saverZone}`,
+    `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
+    `osnovna tarifa ${transport.toFixed(2)} €`,
+  ];
+  if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
+  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
+  details.push(`gorivo 48,25% = ${fuel.toFixed(2)} €`);
+  if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
+
+  return {
+    id,
+    name,
+    carrier: "UPS",
+    price: round2(fuelBasis + fuel + exportClearance),
+    possible: true,
+    details,
+    serviceType,
+    warning: upsWarnings(country, false),
+    status: "surcharge",
+  };
+};
+
 const sortResults = (results: PriceResult[]) => [...results].sort((a, b) => {
   if (a.possible !== b.possible) return a.possible ? -1 : 1;
   if (a.status !== b.status && !a.possible) return a.status === "manual" ? -1 : 1;
@@ -890,7 +1096,8 @@ const winner = (results: PriceResult[]) => results.find((result) => result.possi
 export const calculatePrices = (input: PricingInput): PricingResults => {
   if (input.destinationCountry !== "Croatia") {
     const tariff = EXPORT_TARIFF_MAP[input.destinationCountry];
-    if (!tariff) {
+    const upsCountry = getUpsCountry(input.destinationCountry);
+    if (!tariff && !upsCountry) {
       const missing = unavailable("export-country", "Izvoz", "MBE", "MBE Economy", "Za odabranu državu nema ulaznih tarifa.");
       return {
         economy: [missing],
@@ -903,8 +1110,12 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
         recommendedWinner: null,
       };
     }
-    const economy = sortResults([calcDPDExport(input, tariff), calcHPExport(input, tariff), calcGLSExport(input, tariff)]);
-    const express: PriceResult[] = [];
+    const economyCandidates: PriceResult[] = [];
+    if (tariff) economyCandidates.push(calcDPDExport(input, tariff), calcHPExport(input, tariff), calcGLSExport(input, tariff));
+    if (upsCountry) economyCandidates.push(calcUPSStandard(input, upsCountry));
+    const expressCandidates: PriceResult[] = upsCountry ? [calcUPSExpressSaver(input, upsCountry)] : [];
+    const economy = sortResults(economyCandidates);
+    const express = sortResults(expressCandidates);
     const economyWinner = winner(economy);
     const expressWinner = winner(express);
     const overallWinner = winner(sortResults([...economy, ...express]));
