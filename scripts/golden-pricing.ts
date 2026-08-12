@@ -12,6 +12,7 @@ const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
   cod: false,
   codAmount: 0,
   goodsValue: 0,
+  safeValue: false,
   additionalServices: noExtras,
   ...overrides,
 });
@@ -127,6 +128,26 @@ assert.equal(austria.recommendedWinner?.id, "dpd-export");
 assert.deepEqual(exportCodCarriers("Austria"), []);
 assert.deepEqual(exportCodCarriers("Slovenia"), ["GLS", "DPD"]);
 assert.deepEqual(exportCodCarriers("Poland"), ["DPD"]);
+
+const austriaSafeValue = calculatePrices(shipment({
+  destinationCountry: "Austria",
+  postalCode: "",
+  goodsValue: 1000,
+  safeValue: true,
+  packages: [box(2, 30, 20, 10)],
+}));
+price(austriaSafeValue, "dpd-export", 16.94);
+assert.match(find(austriaSafeValue, "dpd-export").details.join(" "), /MBE SafeValue 1,15%.*11\.50 €/);
+
+const austriaSafeValueMinimum = calculatePrices(shipment({
+  destinationCountry: "Austria",
+  postalCode: "",
+  goodsValue: 100,
+  safeValue: true,
+  packages: [box(2, 30, 20, 10)],
+}));
+price(austriaSafeValueMinimum, "dpd-export", 10.94);
+assert.match(find(austriaSafeValueMinimum, "dpd-export").details.join(" "), /min\. 5,50 € = 5\.50 €/);
 
 const greatBritain = calculatePrices(shipment({
   destinationCountry: "Great Britain",

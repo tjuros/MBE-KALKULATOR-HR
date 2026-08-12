@@ -53,6 +53,7 @@ export type PricingInput = {
   cod: boolean;
   codAmount: number;
   goodsValue: number;
+  safeValue: boolean;
   additionalServices: AdditionalServices;
 };
 
@@ -249,6 +250,50 @@ const unavailable = (
   warning: reason,
   status,
 });
+
+const SAFE_VALUE_RATE = 0.0115;
+const SAFE_VALUE_MINIMUM = 5.5;
+const SAFE_VALUE_APPROVAL_THRESHOLD = 50000;
+const SAFE_VALUE_MAXIMUM = 200000;
+
+const addSafeValue = (result: PriceResult, input: PricingInput): PriceResult => {
+  if (!input.safeValue || !result.possible || result.price === null) return result;
+  if (input.goodsValue <= 0) {
+    return {
+      ...result,
+      price: null,
+      possible: false,
+      details: [...result.details, "Za MBE SafeValue treba unijeti deklariranu vrijednost robe."],
+      status: "manual",
+      warning: "Za MBE SafeValue treba unijeti deklariranu vrijednost robe.",
+    };
+  }
+  if (input.goodsValue > SAFE_VALUE_MAXIMUM) {
+    return {
+      ...result,
+      price: null,
+      possible: false,
+      details: [...result.details, "MBE SafeValue standardni limit je 200.000 € po pošiljci / štetnom događaju."],
+      status: "manual",
+      warning: "Deklarirana vrijednost prelazi standardni MBE SafeValue limit od 200.000 €; potrebna je posebna provjera.",
+    };
+  }
+  const fee = Math.max(SAFE_VALUE_MINIMUM, input.goodsValue * SAFE_VALUE_RATE);
+  const approvalRequired = input.goodsValue > SAFE_VALUE_APPROVAL_THRESHOLD;
+  const safeValueWarning = approvalRequired
+    ? "MBE SafeValue za deklariranu vrijednost iznad 50.000 € zahtijeva prethodni upitnik i odobrenje."
+    : undefined;
+  return {
+    ...result,
+    price: round2(result.price + fee),
+    details: [
+      ...result.details,
+      `MBE SafeValue 1,15% deklarirane vrijednosti, min. 5,50 € = ${fee.toFixed(2)} €`,
+    ],
+    status: approvalRequired ? "manual" : "surcharge",
+    warning: [result.warning, safeValueWarning].filter(Boolean).join(" ") || undefined,
+  };
+};
 
 type AddOnRates = Partial<Record<keyof AdditionalServices, number>>;
 
@@ -1119,8 +1164,8 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     if (tariff) economyCandidates.push(calcDPDExport(input, tariff), calcHPExport(input, tariff), calcGLSExport(input, tariff));
     if (upsCountry) economyCandidates.push(calcUPSStandard(input, upsCountry));
     const expressCandidates: PriceResult[] = upsCountry ? [calcUPSExpressSaver(input, upsCountry)] : [];
-    const economy = sortResults(economyCandidates);
-    const express = sortResults(expressCandidates);
+    const economy = sortResults(economyCandidates.map((result) => addSafeValue(result, input)));
+    const express = sortResults(expressCandidates.map((result) => addSafeValue(result, input)));
     const economyWinner = winner(economy);
     const expressWinner = winner(express);
     const overallWinner = winner(sortResults([...economy, ...express]));
@@ -1142,9 +1187,9 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     calcInTime(input),
     calcLagermax(input),
     calcHPPallet(input),
-  ]);
-  const express = sortResults([calcGLS(input)]);
-  const lockers = sortResults([calcBoxNow(input)]);
+  ].map((result) => addSafeValue(result, input)));
+  const express = sortResults([calcGLS(input)].map((result) => addSafeValue(result, input)));
+  const lockers = sortResults([calcBoxNow(input)].map((result) => addSafeValue(result, input)));
   const economyWinner = winner(economy);
   const expressWinner = winner(express);
   const lockerWinner = winner(lockers);
