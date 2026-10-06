@@ -37,7 +37,7 @@ price(virovitica, "overseas-multi", 5.48);
 assert.match(find(virovitica, "overseas-multi").details.join(" "), /volumni popust 6% od 01\.10\.2026\./);
 assert.match(find(virovitica, "overseas-multi").details.join(" "), /gorivo 8%/);
 price(virovitica, "dpd-standard", 6.58);
-price(virovitica, "gls-express", 10.58);
+price(virovitica, "gls-express", 10.62);
 price(virovitica, "lagermax", 30.91);
 price(virovitica, "intime", 43.01);
 assert.equal(find(virovitica, "box-now").possible, false);
@@ -49,7 +49,7 @@ const korcula = calculatePrices(shipment({
 }));
 price(korcula, "hp-paket24", 5.45);
 price(korcula, "dpd-standard", 13.58);
-price(korcula, "gls-express", 10.58);
+price(korcula, "gls-express", 10.62);
 price(korcula, "intime", 51.98);
 price(korcula, "lagermax", 62.64);
 assert.equal(find(korcula, "overseas-multi").possible, false, "Overseas Cargo is not available for 20260");
@@ -65,7 +65,10 @@ price(osijekCod, "box-now", 1.8);
 price(osijekCod, "hp-paket24", 2.7);
 price(osijekCod, "dpd-standard", 2.79);
 price(osijekCod, "overseas-single", 2.95);
-price(osijekCod, "gls-express", 4.65);
+price(osijekCod, "gls-express", 4.67);
+price(osijekCod, "gls-locker", 3.74);
+assert.match(find(osijekCod, "gls-locker").details.join(" "), /kartično plaćanje COD 1% = 0\.40 €/);
+assert.match(find(osijekCod, "gls-express").warning ?? "", /1% iznosa pouzeća/);
 price(osijekCod, "intime", 5.49);
 assert.equal(osijekCod.overallWinner?.id, "box-now", "BOX NOW remains the absolute cheapest transport option");
 assert.equal(osijekCod.recommendedWinner?.id, "hp-paket24", "Recommendation must stay within MBE Economy");
@@ -80,7 +83,7 @@ price(zagrebBulk, "hp-paket24", 41.8);
 price(zagrebBulk, "overseas-multi", 44.22);
 price(zagrebBulk, "dpd-standard", 59.22);
 price(zagrebBulk, "intime", 63.02);
-price(zagrebBulk, "gls-express", 88.14);
+price(zagrebBulk, "gls-express", 88.5);
 price(zagrebBulk, "lagermax", 89.54);
 
 
@@ -90,6 +93,13 @@ const overseasOversize = calculatePrices(shipment({
 }));
 assert.equal(find(overseasOversize, "overseas-single").status, "manual");
 assert.match(find(overseasOversize, "overseas-single").details.join(" "), /OVSZ je 1\.50/);
+
+
+const glsLockerLimit = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(2, 51, 20, 20)],
+}));
+assert.equal(find(glsLockerLimit, "gls-locker").possible, false, "GLS locker must reject parcels above 50 cm on any side");
 
 const unresolvedOsijek = calculatePrices(shipment({
   postalCode: "31000",
@@ -106,7 +116,7 @@ const documentReturn = calculatePrices(shipment({
   postalCode: "10000",
   additionalServices: { ...noExtras, documentReturn: true },
 }));
-price(documentReturn, "gls-express", 6.62);
+price(documentReturn, "gls-express", 6.64);
 
 const longInTimeShipment = calculatePrices(shipment({
   postalCode: "10000",
@@ -124,7 +134,8 @@ const austria = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 price(austria, "dpd-export", 5.44);
-price(austria, "gls-export", 7);
+price(austria, "gls-export", 7.03);
+assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
 price(austria, "ups-standard", 14.79);
 price(austria, "ups-express-saver", 25.77);
@@ -145,7 +156,7 @@ const greatBritain = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 price(greatBritain, "hp-ems", 33.97);
-price(greatBritain, "gls-export", 42.07);
+price(greatBritain, "gls-export", 42.11);
 price(greatBritain, "dpd-export", 44.15);
 price(greatBritain, "ups-standard", 78.14);
 price(greatBritain, "ups-express-saver", 35.44);

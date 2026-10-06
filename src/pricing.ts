@@ -104,6 +104,32 @@ const GLS_MULTI_5_PLUS: Tier[] = [
   { max: 25, price: 6.08 }, { max: 30, price: 7.31 }, { max: 40, price: 8.52 },
 ];
 
+const GLS_LOCKER_SINGLE: Tier[] = [
+  { max: 2, price: 2.29 }, { max: 3, price: 2.29 }, { max: 5, price: 2.29 },
+  { max: 10, price: 3.46 }, { max: 15, price: 4.14 }, { max: 20, price: 5.05 },
+  { max: 25, price: 6.18 }, { max: 30, price: 7.53 }, { max: 40, price: 8.66 },
+];
+
+const GLS_LOCKER_MULTI_2_4: Tier[] = [
+  { max: 2, price: 1.31 }, { max: 3, price: 1.51 }, { max: 5, price: 1.63 },
+  { max: 10, price: 2.42 }, { max: 15, price: 3.48 }, { max: 20, price: 4.26 },
+  { max: 25, price: 5.08 }, { max: 30, price: 6.57 }, { max: 40, price: 7.42 },
+];
+
+const GLS_LOCKER_MULTI_5_PLUS: Tier[] = [
+  { max: 2, price: 0.98 }, { max: 3, price: 1.21 }, { max: 5, price: 1.34 },
+  { max: 10, price: 2.15 }, { max: 15, price: 3.14 }, { max: 20, price: 3.91 },
+  { max: 25, price: 4.75 }, { max: 30, price: 5.98 }, { max: 40, price: 7.19 },
+];
+
+const GLS_FUEL_INDEX = 1.652; // Latest GLS Croatia published index: September 2026.
+const GLS_FUEL_CATEGORY_COUNT = Math.ceil((GLS_FUEL_INDEX - 1) / 0.03);
+const GLS_DOMESTIC_FUEL_PER_PACKAGE = GLS_FUEL_CATEGORY_COUNT * 0.02;
+const GLS_EXPORT_FUEL = GLS_FUEL_CATEGORY_COUNT * 0.006;
+const GLS_DOMESTIC_SMS = 0.12;
+const GLS_DOMESTIC_COD = 0.49;
+const GLS_BANK_CARD_RATE = 0.01;
+
 const DPD_SINGLE: Tier[] = [
   { max: 2, price: 2.39 }, { max: 5, price: 2.47 }, { max: 15, price: 3.05 },
   { max: 25, price: 3.89 }, { max: 31.5, price: 5.44 },
@@ -364,12 +390,12 @@ export const calcGLS = (input: PricingInput): PriceResult => {
     base += itemPrice;
   }
 
-  const fuel = 0.42 * packages.length;
-  const sms = 0.12;
-  const codFee = input.cod ? 0.49 : 0;
+  const fuel = GLS_DOMESTIC_FUEL_PER_PACKAGE * packages.length;
+  const sms = GLS_DOMESTIC_SMS;
+  const codFee = input.cod ? GLS_DOMESTIC_COD : 0;
   const details = [
     `${packages.length === 1 ? "single" : packages.length <= 4 ? "multi 2–4" : "multi 5+"}: ${base.toFixed(2)} €`,
-    `gorivo ${packages.length} × 0,42 € = ${fuel.toFixed(2)} €`,
+    `gorivo ${packages.length} × ${GLS_DOMESTIC_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
     `SMS po pošiljci = ${sms.toFixed(2)} €`,
   ];
   if (special) details.push("GLS posebno dostavno područje");
@@ -391,6 +417,60 @@ export const calcGLS = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: special || input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
+    warning: input.cod ? "Ako primatelj plati pouzeće karticom, GLS dodatno naplaćuje 1% iznosa pouzeća." : undefined,
+  };
+};
+
+export const calcGLSLocker = (input: PricingInput): PriceResult => {
+  const id = "gls-locker";
+  const serviceType: ServiceType = "MBE Paketomati";
+
+  if (Object.values(input.additionalServices).some(Boolean)) {
+    return unavailable(id, "GLS Paketomat", "GLS", serviceType, "Odabrane dodatne usluge nisu ugovorene za GLS Paketomat.", "manual");
+  }
+
+  for (const item of input.packages) {
+    if (item.weight > 40 || !fitsDimensions(item, [50, 50, 50])) {
+      return unavailable(id, "GLS Paketomat", "GLS", serviceType, "GLS Paketomat: paket mora biti do 40 kg i najviše 50 × 50 × 50 cm.");
+    }
+  }
+
+  const table = input.packages.length === 1
+    ? GLS_LOCKER_SINGLE
+    : input.packages.length <= 4
+      ? GLS_LOCKER_MULTI_2_4
+      : GLS_LOCKER_MULTI_5_PLUS;
+
+  let base = 0;
+  for (const item of input.packages) {
+    const itemPrice = tierPrice(table, item.weight);
+    if (itemPrice === null) return unavailable(id, "GLS Paketomat", "GLS", serviceType, "Nema GLS Paketomat tarife za unesenu težinu.");
+    base += itemPrice;
+  }
+
+  const fuel = GLS_DOMESTIC_FUEL_PER_PACKAGE * input.packages.length;
+  const sms = GLS_DOMESTIC_SMS;
+  const codFee = input.cod ? GLS_DOMESTIC_COD : 0;
+  const bankCardFee = input.cod ? input.codAmount * GLS_BANK_CARD_RATE : 0;
+  const details = [
+    `${input.packages.length === 1 ? "single" : input.packages.length <= 4 ? "multi 2–4" : "multi 5+"} Paketomat: ${base.toFixed(2)} €`,
+    `gorivo ${input.packages.length} × ${GLS_DOMESTIC_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `SMS po pošiljci = ${sms.toFixed(2)} €`,
+  ];
+  if (input.cod) {
+    details.push(`COD +${codFee.toFixed(2)} €`);
+    details.push(`kartično plaćanje COD 1% = ${bankCardFee.toFixed(2)} €`);
+  }
+
+  return {
+    id,
+    name: "GLS Paketomat",
+    carrier: "GLS",
+    price: round2(base + fuel + sms + codFee + bankCardFee),
+    possible: true,
+    details,
+    serviceType,
+    status: input.cod ? "surcharge" : "ok",
   };
 };
 
@@ -759,7 +839,6 @@ export const calcBoxNow = (input: PricingInput): PriceResult => {
 };
 
 const EXPORT_TARIFF_MAP = EXPORT_TARIFFS as Record<string, ExportCountryTariff>;
-const GLS_EXPORT_FUEL = 0.126;
 const GLS_EXPORT_SMS = 1.13;
 const GLS_EXPORT_COD_COUNTRIES = new Set(["Slovakia", "Romania", "Slovenia", "Hungary", "Czech Republic"]);
 const DPD_EXPORT_COD_RATES: Record<string, number> = {
@@ -816,7 +895,7 @@ export const calcGLSExport = (input: PricingInput, tariff: ExportCountryTariff):
   const customs = tariff.region === "WW" ? 33.18 : 0;
   const details = [
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo 12,6% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(GLS_EXPORT_FUEL * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`,
     `FlexDelivery e-mail + SMS ${input.packages.length} × 1,13 € = ${sms.toFixed(2)} €`,
   ];
   if (codFee) details.push(`COD ${input.packages.length} × 0,65 € = ${codFee.toFixed(2)} €`);
@@ -1162,7 +1241,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     calcHPPallet(input),
   ]);
   const express = sortResults([calcGLS(input)]);
-  const lockers = sortResults([calcBoxNow(input)]);
+  const lockers = sortResults([calcBoxNow(input), calcGLSLocker(input)]);
   const economyWinner = winner(economy);
   const expressWinner = winner(express);
   const lockerWinner = winner(lockers);
