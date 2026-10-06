@@ -33,7 +33,8 @@ const virovitica = calculatePrices(shipment({
   packages: [box(12, 60, 60, 40), box(12, 60, 60, 40)],
 }));
 price(virovitica, "hp-paket24", 5.45);
-price(virovitica, "overseas-multi", 5.72);
+price(virovitica, "overseas-multi", 5.38);
+assert.match(find(virovitica, "overseas-multi").details.join(" "), /volumni popust 6% od 01\.10\.2026\./);
 price(virovitica, "dpd-standard", 6.58);
 price(virovitica, "gls-express", 10.58);
 price(virovitica, "lagermax", 30.91);
@@ -62,7 +63,7 @@ const osijekCod = calculatePrices(shipment({
 price(osijekCod, "box-now", 1.8);
 price(osijekCod, "hp-paket24", 2.7);
 price(osijekCod, "dpd-standard", 2.79);
-price(osijekCod, "overseas-single", 3.07);
+price(osijekCod, "overseas-single", 2.9);
 price(osijekCod, "gls-express", 4.65);
 price(osijekCod, "intime", 5.49);
 assert.equal(osijekCod.overallWinner?.id, "box-now", "BOX NOW remains the absolute cheapest transport option");
@@ -75,7 +76,7 @@ const zagrebBulk = calculatePrices(shipment({
 price(zagrebBulk, "box-now", 25.2);
 price(zagrebBulk, "hp-paleta", 30.56);
 price(zagrebBulk, "hp-paket24", 41.8);
-price(zagrebBulk, "overseas-multi", 46.17);
+price(zagrebBulk, "overseas-multi", 43.4);
 price(zagrebBulk, "dpd-standard", 59.22);
 price(zagrebBulk, "intime", 63.02);
 price(zagrebBulk, "gls-express", 88.14);
