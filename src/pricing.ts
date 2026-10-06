@@ -82,6 +82,10 @@ export type PricingResults = {
 type Tier = { max: number; price: number };
 type Zone = 1 | 2 | 3;
 
+const OVERSEAS_VOLUME_DISCOUNT = 0.06; // Effective from 2026-10-01.
+const OVERSEAS_FUEL_SURCHARGE = 0.08; // MBE matrix at latest published diesel reference 1.86 EUR/l.
+const OVERSEAS_OVSZ_FEE = 1.5; // Effective from 2026-10-01; acceptance of out-of-standard parcels still requires confirmation.
+
 const GLS_SINGLE: Tier[] = [
   { max: 2, price: 3.62 }, { max: 3, price: 3.62 }, { max: 5, price: 3.62 },
   { max: 10, price: 4.79 }, { max: 15, price: 5.47 }, { max: 20, price: 6.38 },
@@ -528,17 +532,24 @@ export const calcOverseasSingle = (input: PricingInput): PriceResult => {
   const item = input.packages[0];
   const size = dimensions(item);
   if (item.weight > 31.5 || size.longest > 100 || size.girth > 340) {
-    return unavailable(id, "Overseas single", "Overseas", serviceType, "Izvan Overseas standarda (31,5 kg, duljina 100 cm ili opseg 340 cm); potrebna je potvrda.", "manual");
+    return unavailable(id, "Overseas single", "Overseas", serviceType, `Izvan Overseas standarda (31,5 kg, duljina 100 cm ili opseg 340 cm); ako Overseas prihvati paket, ugovoreni OVSZ je ${OVERSEAS_OVSZ_FEE.toFixed(2)} €. Potrebna je potvrda.`, "manual");
   }
   const base = tierPrice(OVERSEAS_SINGLE, item.weight);
   if (base === null) return unavailable(id, "Overseas single", "Overseas", serviceType, "Nema tarife za unesenu težinu.");
-  const fuel = base * 0.06;
-  const remote = isOverseasRemote(input.postalCode) ? base * 0.2 : 0;
+  const volumeDiscount = base * OVERSEAS_VOLUME_DISCOUNT;
+  const discountedBase = base - volumeDiscount;
+  const fuel = discountedBase * OVERSEAS_FUEL_SURCHARGE;
+  const remote = isOverseasRemote(input.postalCode) ? discountedBase * 0.2 : 0;
   const codFee = input.cod ? 0.3 : 0;
-  const details = [`osnovna tarifa ${base.toFixed(2)} €`, `gorivo 6% = ${fuel.toFixed(2)} €`];
+  const details = [
+    `osnovna tarifa ${base.toFixed(2)} €`,
+    `volumni popust 6% od 01.10.2026. = -${volumeDiscount.toFixed(2)} €`,
+    `tarifa nakon popusta ${discountedBase.toFixed(2)} €`,
+    `gorivo ${(OVERSEAS_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+  ];
   if (remote) details.push(`otok / posebni režim 20% = ${remote.toFixed(2)} €`);
   if (input.cod) details.push("COD +0,30 €");
-  const optional = addOptionalServices(base + fuel + remote + codFee, input, {
+  const optional = addOptionalServices(discountedBase + fuel + remote + codFee, input, {
     documentReturn: 0.53,
     addresseeOnly: 0,
   }, details);
@@ -565,20 +576,27 @@ export const calcOverseasMulti = (input: PricingInput): PriceResult => {
   for (const item of input.packages) {
     const size = dimensions(item);
     if (item.weight > 31.5 || size.longest > 100 || size.girth > 340) {
-      return unavailable(id, "Overseas multi", "Overseas", serviceType, "Najmanje jedan paket je izvan Overseas standarda; potrebna je ručna potvrda.", "manual");
+      return unavailable(id, "Overseas multi", "Overseas", serviceType, `Najmanje jedan paket je izvan Overseas standarda; ako Overseas prihvati paket, ugovoreni OVSZ je ${OVERSEAS_OVSZ_FEE.toFixed(2)} € po takvom paketu. Potrebna je ručna potvrda.`, "manual");
     }
   }
   const weight = totalWeight(input.packages);
   if (weight > 500) return unavailable(id, "Overseas multi", "Overseas", serviceType, "Ulazna Multi matrica potvrđena je do 500 kg ukupno.", "manual");
   const base = weight <= 100 ? tierPrice(OVERSEAS_MULTI, weight) : 14.56 + Math.ceil(weight - 100) * 0.25;
   if (base === null) return unavailable(id, "Overseas multi", "Overseas", serviceType, "Nema tarife za unesenu težinu.");
-  const fuel = base * 0.06;
-  const remote = isOverseasRemote(input.postalCode) ? base * 0.2 : 0;
+  const volumeDiscount = base * OVERSEAS_VOLUME_DISCOUNT;
+  const discountedBase = base - volumeDiscount;
+  const fuel = discountedBase * OVERSEAS_FUEL_SURCHARGE;
+  const remote = isOverseasRemote(input.postalCode) ? discountedBase * 0.2 : 0;
   const codFee = input.cod ? 0.3 : 0;
-  const details = [`osnovna Multi tarifa ${base.toFixed(2)} €`, `gorivo 6% = ${fuel.toFixed(2)} €`];
+  const details = [
+    `osnovna Multi tarifa ${base.toFixed(2)} €`,
+    `volumni popust 6% od 01.10.2026. = -${volumeDiscount.toFixed(2)} €`,
+    `tarifa nakon popusta ${discountedBase.toFixed(2)} €`,
+    `gorivo ${(OVERSEAS_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+  ];
   if (remote) details.push(`otok / posebni režim 20% = ${remote.toFixed(2)} €`);
   if (input.cod) details.push("COD +0,30 €");
-  const optional = addOptionalServices(base + fuel + remote + codFee, input, {
+  const optional = addOptionalServices(discountedBase + fuel + remote + codFee, input, {
     documentReturn: 0.53,
     addresseeOnly: 0,
   }, details);
