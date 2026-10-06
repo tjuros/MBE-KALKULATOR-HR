@@ -304,7 +304,7 @@ export default function App() {
                 <div style={carrierPillStyle("MBE")}>MAIL BOXES ETC.</div>
                 <div style={{ fontSize: isMobile ? 19 : 25, fontWeight: 900, lineHeight: 1.05 }}>SmartChoice</div>
               </div>
-              <div style={{ color: "#64748b", marginTop: 4, fontSize: isMobile ? 14 : 16 }}>Mail Boxes Etc. Križevci · ulazne cijene bez PDV-a</div>
+              <div style={{ color: "#64748b", marginTop: 4, fontSize: isMobile ? 14 : 16 }}>Mail Boxes Etc. Hrvatska · ulazne cijene bez PDV-a</div>
             </div>
             <button style={{ ...buttonStyle(), minHeight: 38, padding: "8px 12px" }} onClick={resetShipment}>Reset</button>
           </div>
@@ -456,11 +456,11 @@ export default function App() {
 
       <div style={{ position: isMobile ? "fixed" : "sticky", left: 0, right: 0, bottom: 0, zIndex: 30, padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : 0, background: isMobile ? "rgba(248,250,252,.96)" : "transparent", backdropFilter: isMobile ? "blur(10px)" : "none", borderTop: isMobile ? "1px solid #e5e7eb" : "none", marginTop: 14 }}>
         <div style={{ maxWidth: 1040, margin: "0 auto" }}>
-          <details style={cardStyle()}>
+          <details style={{ ...cardStyle(), background: "#eff6ff", border: "2px solid #93c5fd", boxShadow: "0 4px 14px rgba(37,99,235,.10)" }}>
             <summary style={sectionSummaryStyle()}>
               <span style={{ display: "grid", gap: 2 }}>
-                <span>{expressFallback ? "MBE Express opcija" : "MBE Economy preporuka"}</span>
-                <span style={{ color: "#64748b", fontSize: 12, fontWeight: 700 }}>{recommendation ? recommendation.name : "Pregled pošiljke"}</span>
+                <span>Sažetak pošiljke</span>
+                <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>{recommendation ? `${expressFallback ? "MBE Express opcija" : "MBE Economy preporuka"} · ${recommendation.name}` : "Pregled unesenih podataka"}</span>
               </span>
               <span style={{ color: recommendation ? (expressFallback ? "#b91c1c" : "#166534") : "#64748b", fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}>
                 <span>{recommendation ? money(recommendation.price) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
@@ -491,6 +491,9 @@ export default function App() {
               {isDomestic && results?.lockerWinner ? <div>Paketomat, dodatno: <strong>{results.lockerWinner.name} ({money(results.lockerWinner.price)})</strong></div> : null}
             </div>
           </details>
+          <div style={{ marginTop: 8, padding: "0 4px", color: "#64748b", fontSize: 11, lineHeight: 1.45, textAlign: "center" }}>
+            Prikazani izračuni i cijene informativnog su karaktera i ne predstavljaju obvezujuću ponudu. Konačna cijena ovisi o stvarnim podacima pošiljke, važećim uvjetima i konačnom obračunu prijevoznika.
+          </div>
         </div>
       </div>
     </div>
