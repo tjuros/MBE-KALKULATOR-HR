@@ -135,6 +135,30 @@ const DPD_SINGLE: Tier[] = [
   { max: 25, price: 3.89 }, { max: 31.5, price: 5.44 },
 ];
 
+const DPD_SHOP: Tier[] = [
+  { max: 2, price: 1.70 }, { max: 5, price: 1.80 }, { max: 10, price: 2.00 },
+  { max: 15, price: 2.25 }, { max: 20, price: 2.70 },
+];
+
+const DPD_DIESEL_REFERENCE_MONTH = "09/2026";
+const DPD_DIESEL_REFERENCE = 1.96; // Average of September 2026 EC Weekly Oil Bulletin observations for Croatia.
+
+const dpdRoadFuelPerPackage = (dieselPrice: number) => {
+  if (dieselPrice <= 1.60) return 0;
+  if (dieselPrice <= 1.70) return 0.10;
+  if (dieselPrice <= 1.80) return 0.20;
+  if (dieselPrice <= 1.90) return 0.40;
+  if (dieselPrice <= 2.00) return 0.50;
+  if (dieselPrice <= 2.20) return 0.55;
+  if (dieselPrice <= 2.30) return 0.60;
+  if (dieselPrice <= 2.40) return 0.65;
+  if (dieselPrice <= 2.50) return 0.70;
+  return 0.70 + Math.ceil((dieselPrice - 2.50) / 0.10) * 0.05;
+};
+
+const DPD_ROAD_FUEL_PER_PACKAGE = dpdRoadFuelPerPackage(DPD_DIESEL_REFERENCE);
+const DPD_ISLAND_SURCHARGE = 3.50;
+
 const HP_PARCEL: Tier[] = [
   { max: 5, price: 2.2 }, { max: 10, price: 2.8 }, { max: 15, price: 3.3 },
   { max: 20, price: 4.05 }, { max: 30, price: 5.45 },
@@ -481,7 +505,10 @@ export const calcDPD = (input: PricingInput): PriceResult => {
   for (const item of packages) {
     const size = dimensions(item);
     if (item.weight > 31.5 || size.longest > 175 || size.girth > 300) {
-      return unavailable(id, "DPD", "DPD", serviceType, "Izvan DPD standarda; nestandardne dimenzije ili masa zahtijevaju prethodni dogovor.", "manual");
+      const extras = [];
+      if (size.girth > 300 || size.longest > 175) extras.push("oversize prema ponudi +25,00 € u domaćem prometu");
+      if (item.weight > 31.5) extras.push("overweight prema ponudi +2,00 €/kg iznad 31,5 kg");
+      return unavailable(id, "DPD", "DPD", serviceType, `Izvan DPD standarda; potreban prethodni dogovor. ${extras.join("; ")}.`, "manual");
     }
   }
   if (input.cod && input.codAmount > 2500) return unavailable(id, "DPD", "DPD", serviceType, "DPD gotovinska otkupnina može biti najviše 2.500 €.");
@@ -490,13 +517,13 @@ export const calcDPD = (input: PricingInput): PriceResult => {
     ? 2.89 * packages.length
     : tierPrice(DPD_SINGLE, packages[0].weight);
   if (base === null) return unavailable(id, "DPD", "DPD", serviceType, "Nema tarife za unesenu težinu.");
-  const fuel = 0.4 * packages.length;
-  const island = isIsland(postalCode) ? 3.5 * packages.length : 0;
+  const fuel = DPD_ROAD_FUEL_PER_PACKAGE * packages.length;
+  const island = isIsland(postalCode) ? DPD_ISLAND_SURCHARGE * packages.length : 0;
   const details = [
     packages.length >= 2 ? `DPD Multi ${packages.length} × 2,89 € = ${base.toFixed(2)} €` : `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${packages.length} × 0,40 € = ${fuel.toFixed(2)} €`,
+    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
   ];
-  if (island) details.push(`otočna nadoplata ${packages.length} × 3,50 € = ${island.toFixed(2)} €`);
+  if (island) details.push(`otočna nadoplata ${packages.length} × ${DPD_ISLAND_SURCHARGE.toFixed(2)} € = ${island.toFixed(2)} €`);
   if (input.cod) details.push("gotovinski COD uključen");
   const optional = addOptionalServices(base + fuel + island, input, {
     documentReturn: 1.83,
@@ -514,6 +541,48 @@ export const calcDPD = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: island || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
+    warning: input.cod ? "Gotovinski COD je uključen. Ako primatelj plati karticom/online, DPD može obračunati zasebnu kartičnu naknadu; njezin iznos nije naveden u dostavljenoj ugovornoj ponudi." : undefined,
+  };
+};
+
+export const calcDPDShop = (input: PricingInput): PriceResult => {
+  const id = "dpd-shop";
+  const serviceType: ServiceType = "MBE Paketomati";
+
+  if (Object.values(input.additionalServices).some(Boolean)) {
+    return unavailable(id, "DPD Pickup / Paketomat", "DPD", serviceType, "Odabrane dodatne usluge nisu ugovorene za DPD Shop/Pickup dostavu.", "manual");
+  }
+
+  if (input.cod) {
+    return unavailable(id, "DPD Pickup / Paketomat", "DPD", serviceType, "DPD paketomat podržava pouzeće preko Monri WSPay, ali ugovoreni trošak kartičnog plaćanja nije naveden u dostavljenoj ponudi; potrebna je ručna provjera.", "manual");
+  }
+
+  let base = 0;
+  for (const item of input.packages) {
+    const size = dimensions(item);
+    if (item.weight > 20 || size.longest > 100 || size.girth > 250) {
+      return unavailable(id, "DPD Pickup / Paketomat", "DPD", serviceType, "DPD Pickup: najviše 20 kg, duljina 100 cm i opseg 250 cm po paketu.");
+    }
+    const itemPrice = tierPrice(DPD_SHOP, item.weight);
+    if (itemPrice === null) return unavailable(id, "DPD Pickup / Paketomat", "DPD", serviceType, "Nema DPD Shop tarife za unesenu težinu.");
+    base += itemPrice;
+  }
+
+  const fuel = DPD_ROAD_FUEL_PER_PACKAGE * input.packages.length;
+  const details = [
+    `DPD Shop ${input.packages.length} paket(a): ${base.toFixed(2)} €`,
+    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+  ];
+
+  return {
+    id,
+    name: "DPD Pickup / Paketomat",
+    carrier: "DPD",
+    price: round2(base + fuel),
+    possible: true,
+    details,
+    serviceType,
+    status: "ok",
   };
 };
 
@@ -928,7 +997,10 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
   for (const item of input.packages) {
     const size = dimensions(item);
     if (item.weight > 31.5 || size.longest > 175 || size.girth > 300) {
-      return unavailable(id, "DPD Export", "DPD", serviceType, "DPD izvoz: najviše 31,5 kg, duljina 175 cm i opseg 300 cm po paketu.", "manual");
+      const extras = [];
+      if (size.longest > 175 || size.girth > 300) extras.push("oversize prema ponudi +35,00 € u međunarodnom prometu");
+      if (item.weight > 31.5) extras.push("overweight prema ponudi +35,00 € u međunarodnom prometu");
+      return unavailable(id, "DPD Export", "DPD", serviceType, `DPD izvoz je izvan standarda; potreban prethodni dogovor. ${extras.join("; ")}.`, "manual");
     }
   }
   const codRate = DPD_EXPORT_COD_RATES[input.destinationCountry];
@@ -937,12 +1009,12 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
   }
   const base = exportBase(tariff.dpd, input.packages, 31.5);
   if (base === null) return unavailable(id, "DPD Export", "DPD", serviceType, "Nema DPD izvozne tarife za unesenu težinu.");
-  const fuel = 0.4 * input.packages.length;
+  const fuel = DPD_ROAD_FUEL_PER_PACKAGE * input.packages.length;
   const codFee = input.cod ? (codRate ?? 0) * input.packages.length : 0;
   const customs = tariff.region === "WW" ? dpdExportCustoms(input) : 0;
   const details = [
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${input.packages.length} × 0,40 € = ${fuel.toFixed(2)} €`,
+    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
   ];
   if (codFee) details.push(`COD ${input.packages.length} × ${codRate.toFixed(2)} € = ${codFee.toFixed(2)} €`);
   if (customs) details.push(`izvozno carinjenje +${customs.toFixed(2)} €`);
@@ -1241,7 +1313,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     calcHPPallet(input),
   ]);
   const express = sortResults([calcGLS(input)]);
-  const lockers = sortResults([calcBoxNow(input), calcGLSLocker(input)]);
+  const lockers = sortResults([calcBoxNow(input), calcGLSLocker(input), calcDPDShop(input)]);
   const economyWinner = winner(economy);
   const expressWinner = winner(express);
   const lockerWinner = winner(lockers);

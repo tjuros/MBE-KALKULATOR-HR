@@ -36,7 +36,7 @@ price(virovitica, "hp-paket24", 5.45);
 price(virovitica, "overseas-multi", 5.48);
 assert.match(find(virovitica, "overseas-multi").details.join(" "), /volumni popust 6% od 01\.10\.2026\./);
 assert.match(find(virovitica, "overseas-multi").details.join(" "), /gorivo 8%/);
-price(virovitica, "dpd-standard", 6.58);
+price(virovitica, "dpd-standard", 6.78);
 price(virovitica, "gls-express", 10.62);
 price(virovitica, "lagermax", 30.91);
 price(virovitica, "intime", 43.01);
@@ -48,7 +48,7 @@ const korcula = calculatePrices(shipment({
   packages: [box(12, 60, 60, 40), box(12, 60, 60, 40)],
 }));
 price(korcula, "hp-paket24", 5.45);
-price(korcula, "dpd-standard", 13.58);
+price(korcula, "dpd-standard", 13.78);
 price(korcula, "gls-express", 10.62);
 price(korcula, "intime", 51.98);
 price(korcula, "lagermax", 62.64);
@@ -63,7 +63,10 @@ const osijekCod = calculatePrices(shipment({
 }));
 price(osijekCod, "box-now", 1.8);
 price(osijekCod, "hp-paket24", 2.7);
-price(osijekCod, "dpd-standard", 2.79);
+price(osijekCod, "dpd-standard", 2.89);
+assert.match(find(osijekCod, "dpd-standard").details.join(" "), /09\/2026 \(1\.96 €\/l\).*0\.50 €/);
+assert.match(find(osijekCod, "dpd-standard").warning ?? "", /karticom\/online/);
+assert.equal(find(osijekCod, "dpd-shop").status, "manual", "DPD Shop COD fee is not in the supplied contract");
 price(osijekCod, "overseas-single", 2.95);
 price(osijekCod, "gls-express", 4.67);
 price(osijekCod, "gls-locker", 3.74);
@@ -81,11 +84,32 @@ price(zagrebBulk, "box-now", 25.2);
 price(zagrebBulk, "hp-paleta", 30.56);
 price(zagrebBulk, "hp-paket24", 41.8);
 price(zagrebBulk, "overseas-multi", 44.22);
-price(zagrebBulk, "dpd-standard", 59.22);
+price(zagrebBulk, "dpd-standard", 61.02);
 price(zagrebBulk, "intime", 63.02);
 price(zagrebBulk, "gls-express", 88.5);
 price(zagrebBulk, "lagermax", 89.54);
 
+
+
+const dpdShop = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(1, 30, 20, 10)],
+}));
+price(dpdShop, "dpd-shop", 2.20);
+assert.match(find(dpdShop, "dpd-shop").details.join(" "), /DPD Shop 1 paket/);
+
+const dpdShopTooLarge = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(21, 30, 20, 10)],
+}));
+assert.equal(find(dpdShopTooLarge, "dpd-shop").possible, false);
+
+const dpdOversize = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(10, 176, 30, 30)],
+}));
+assert.equal(find(dpdOversize, "dpd-standard").status, "manual");
+assert.match(find(dpdOversize, "dpd-standard").details.join(" "), /oversize.*25,00 €/);
 
 const overseasOversize = calculatePrices(shipment({
   postalCode: "10000",
@@ -109,7 +133,7 @@ const unresolvedOsijek = calculatePrices(shipment({
 assert.equal(find(unresolvedOsijek, "intime").status, "manual", "Ambiguous InTime zone must not be guessed");
 
 const ugljan = calculatePrices(shipment({ postalCode: "23273" }));
-price(ugljan, "dpd-standard", 6.29);
+price(ugljan, "dpd-standard", 6.39);
 price(ugljan, "lagermax", 20.36);
 
 const documentReturn = calculatePrices(shipment({
@@ -133,7 +157,7 @@ const austria = calculatePrices(shipment({
   postalCode: "",
   packages: [box(2, 30, 20, 10)],
 }));
-price(austria, "dpd-export", 5.44);
+price(austria, "dpd-export", 5.54);
 price(austria, "gls-export", 7.03);
 assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
@@ -157,7 +181,7 @@ const greatBritain = calculatePrices(shipment({
 }));
 price(greatBritain, "hp-ems", 33.97);
 price(greatBritain, "gls-export", 42.11);
-price(greatBritain, "dpd-export", 44.15);
+price(greatBritain, "dpd-export", 44.25);
 price(greatBritain, "ups-standard", 78.14);
 price(greatBritain, "ups-express-saver", 35.44);
 
@@ -167,7 +191,7 @@ const ukraine = calculatePrices(shipment({
   goodsValue: 100,
   packages: [box(2, 30, 20, 10)],
 }));
-price(ukraine, "dpd-export", 44.87);
+price(ukraine, "dpd-export", 44.97);
 assert.equal(find(ukraine, "gls-export").possible, false);
 assert.equal(find(ukraine, "hp-ems").possible, false);
 assert.equal(find(ukraine, "ups-express-saver").possible, false, "UPS Ukraine is suspended in the supplied zone table");
