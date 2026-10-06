@@ -997,7 +997,10 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
   for (const item of input.packages) {
     const size = dimensions(item);
     if (item.weight > 31.5 || size.longest > 175 || size.girth > 300) {
-      return unavailable(id, "DPD Export", "DPD", serviceType, "DPD izvoz: najviše 31,5 kg, duljina 175 cm i opseg 300 cm po paketu.", "manual");
+      const extras = [];
+      if (size.longest > 175 || size.girth > 300) extras.push("oversize prema ponudi +35,00 € u međunarodnom prometu");
+      if (item.weight > 31.5) extras.push("overweight prema ponudi +35,00 € u međunarodnom prometu");
+      return unavailable(id, "DPD Export", "DPD", serviceType, `DPD izvoz je izvan standarda; potreban prethodni dogovor. ${extras.join("; ")}.`, "manual");
     }
   }
   const codRate = DPD_EXPORT_COD_RATES[input.destinationCountry];
