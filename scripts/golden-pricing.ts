@@ -135,6 +135,21 @@ assert.equal(find(unresolvedOsijek, "intime").status, "manual", "Ambiguous InTim
 const ugljan = calculatePrices(shipment({ postalCode: "23273" }));
 price(ugljan, "dpd-standard", 6.39);
 price(ugljan, "lagermax", 20.36);
+assert.match(find(ugljan, "lagermax").details.join(" "), /Ugljan - Pašman: dostava ponedjeljak/);
+assert.match(find(ugljan, "lagermax").warning ?? "", /LMX Zadar jedan dan ranije/);
+
+
+const lagermaxDugiOtok = calculatePrices(shipment({ postalCode: "23281" }));
+assert.equal(find(lagermaxDugiOtok, "lagermax").possible, false);
+assert.match(find(lagermaxDugiOtok, "lagermax").details.join(" "), /Dugi otok.*ne vozi/);
+
+const lagermaxLastovo = calculatePrices(shipment({ postalCode: "20290" }));
+price(lagermaxLastovo, "lagermax", 25.06);
+assert.match(find(lagermaxLastovo, "lagermax").details.join(" "), /Lastovo: dostava 1 put mjesečno/);
+
+const lagermaxKuciste = calculatePrices(shipment({ postalCode: "20267" }));
+price(lagermaxKuciste, "lagermax", 17.06);
+assert.doesNotMatch(find(lagermaxKuciste, "lagermax").details.join(" "), /otok 50%/);
 
 const documentReturn = calculatePrices(shipment({
   postalCode: "10000",
