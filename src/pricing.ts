@@ -213,7 +213,7 @@ const INTIME: Record<Zone, Tier[]> = {
 
 const ISLAND_POSTALS = new Set([
   "20221", "20222", "20223", "20224", "20225", "20226", "20289", "20290",
-  "20260", "20263", "20264", "20267", "20269", "20270", "20271", "20272", "20273", "20274", "20275",
+  "20260", "20263", "20264", "20270", "20271", "20272", "20273", "20274", "20275",
   "21225", "21400", "21403", "21404", "21405", "21410", "21412", "21413", "21420", "21423", "21424",
   "21425", "21426", "21430", "21432", "21450", "21454", "21460", "21462", "21463", "21465", "21466",
   "21467", "21468", "21469", "21480", "21483", "21485", "22232", "22233", "22234", "22235", "22236",
@@ -234,12 +234,86 @@ const GLS_SPECIAL_POSTALS = new Set([
 
 const LAGERMAX_DELIVERABLE_ISLANDS = new Set([
   "51500", "51511", "51512", "51513", "51514", "51515", "51516", "51517",
-  "20260", "20263", "20264", "20267", "20269", "20270", "20271", "20272", "20273", "20274", "20275",
+  "20260", "20263", "20264", "20270", "20271", "20272", "20273", "20274", "20275", "20289", "20290",
   "21400", "21403", "21404", "21405", "21410", "21412", "21413", "21420", "21423", "21424", "21425", "21426",
   "21430", "21432", "21450", "21454", "21460", "21462", "21463", "21465", "21466", "21467", "21468", "21469",
   "21480", "21483", "21485", "23262", "23263", "23264", "23271", "23272", "23273", "23274",
   "51280", "51281", "51550", "51551", "51552", "51554", "51555", "51557", "51561", "51562",
 ]);
+
+const LAGERMAX_DUGI_OTOK_POSTALS = new Set([
+  "23281", "23282", "23283", "23284", "23285", "23286", "23287",
+  "23291", "23292", "23293", "23294", "23295", "23296",
+]);
+
+const LAGERMAX_ISLAND_SCHEDULES: Array<{ postals: Set<string>; label: string; schedule: string; note: string }> = [
+  {
+    postals: new Set(["51500", "51511", "51512", "51513", "51514", "51515", "51516", "51517"]),
+    label: "Krk",
+    schedule: "ponedjeljak - petak",
+    note: "Utovar LMX Rijeka jedan dan ranije; u sezoni su mogući dodatni kamioni kroz tjedan, ovisno o količini robe i kapacitetu.",
+  },
+  {
+    postals: new Set(["51550", "51551", "51552", "51554", "51555", "51557", "51561", "51562"]),
+    label: "Cres - Lošinj",
+    schedule: "srijeda i subota",
+    note: "Utovar LMX Rijeka jedan dan ranije.",
+  },
+  {
+    postals: new Set(["51280", "51281"]),
+    label: "Rab",
+    schedule: "utorak i subota",
+    note: "Utovar LMX Rijeka jedan dan ranije.",
+  },
+  {
+    postals: new Set(["23262", "23263", "23264", "23271", "23272", "23273", "23274"]),
+    label: "Ugljan - Pašman",
+    schedule: "ponedjeljak",
+    note: "Utovar LMX Zadar jedan dan ranije.",
+  },
+  {
+    postals: new Set(["21450", "21454", "21460", "21462", "21463", "21465", "21466", "21467", "21468", "21469"]),
+    label: "Hvar",
+    schedule: "utorak i subota",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+  {
+    postals: new Set(["21400", "21403", "21404", "21405", "21410", "21412", "21413"]),
+    label: "Brač",
+    schedule: "srijeda i subota",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+  {
+    postals: new Set(["21430", "21432"]),
+    label: "Šolta",
+    schedule: "svaka 2 tjedna; subota prema rasporedu",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+  {
+    postals: new Set(["20289", "20290"]),
+    label: "Lastovo",
+    schedule: "1 put mjesečno; subota prema rasporedu",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+  {
+    postals: new Set(["21480", "21483", "21485"]),
+    label: "Vis",
+    schedule: "svaka 2 tjedna; subota prema rasporedu",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+  {
+    postals: new Set(["20260", "20263", "20264", "20270", "20271", "20272", "20273", "20274", "20275"]),
+    label: "Korčula",
+    schedule: "srijeda i subota",
+    note: "Utovar LMX Split jedan dan ranije.",
+  },
+];
+
+const LAGERMAX_FUEL_SURCHARGE = 0.066; // Contracted working factor; last reviewed 2026-10-06.
+const LAGERMAX_ISLAND_SURCHARGE = 0.50;
+
+const lagermaxIslandSchedule = (postalCode: string) =>
+  LAGERMAX_ISLAND_SCHEDULES.find((entry) => entry.postals.has(postalCode)) ?? null;
 
 const OVERSEAS_REMOTE_POSTALS = new Set([
   "20000", "20205", "20207", "20210", "20213", "20215", "20216", "20217", "20218",
@@ -839,9 +913,12 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   const destinationZone = getLagermaxZone(input.postalCode);
   if (!originZone || !destinationZone) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Polazište ili odredište nije pokriveno dostavljenom Lagermax zonskom tablicom.", "manual");
   const zone = Math.max(originZone, destinationZone) as Zone;
+  if (LAGERMAX_DUGI_OTOK_POSTALS.has(input.postalCode)) {
+    return unavailable(id, "Lagermax", "Lagermax", serviceType, "Dugi otok: Lagermax prema dostavljenom rasporedu ne vozi.");
+  }
   const anyIsland = isAnyIsland(input.postalCode);
   if (anyIsland && !LAGERMAX_DELIVERABLE_ISLANDS.has(input.postalCode)) {
-    return unavailable(id, "Lagermax", "Lagermax", serviceType, "Otok nije naveden u Lagermax rasporedu dostave; Dugi otok nije pokriven.", "manual");
+    return unavailable(id, "Lagermax", "Lagermax", serviceType, "Otok nije naveden u dostavljenom Lagermax rasporedu; potrebna je ručna potvrda.", "manual");
   }
   for (const item of input.packages) {
     if (item.weight > 35 || dimensions(item).longest > 250) {
@@ -851,12 +928,14 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   const groups = optimizeOrderedGroups(input.packages, 80, input.packages.length, (weight) => lagermaxBase(zone, weight));
   if (!groups) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Pošiljku nije moguće rasporediti u pošiljke do 80 kg.");
   const base = groups.reduce((sum, group) => sum + group.base, 0);
-  const fuel = base * 0.066;
-  const island = anyIsland ? base * 0.5 : 0;
+  const fuel = base * LAGERMAX_FUEL_SURCHARGE;
+  const island = anyIsland ? base * LAGERMAX_ISLAND_SURCHARGE : 0;
+  const schedule = lagermaxIslandSchedule(input.postalCode);
   const details = [`relacija Z${originZone} → Z${destinationZone}; primijenjena skuplja Z${zone}`];
   details.push(...groups.map((group, index) => `pošiljka ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`));
-  details.push(`gorivo 6,6% = ${fuel.toFixed(2)} €`);
+  details.push(`gorivo ${(LAGERMAX_FUEL_SURCHARGE * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`);
   if (island) details.push(`otok 50% osnovne tarife = ${island.toFixed(2)} €`);
+  if (schedule) details.push(`${schedule.label}: dostava ${schedule.schedule}`);
   return {
     id,
     name: "Lagermax",
@@ -866,6 +945,7 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: "surcharge",
+    warning: schedule ? schedule.note : undefined,
   };
 };
 
