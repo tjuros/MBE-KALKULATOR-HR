@@ -426,12 +426,12 @@ export const calcGLSLocker = (input: PricingInput): PriceResult => {
   const serviceType: ServiceType = "MBE Paketomati";
 
   if (Object.values(input.additionalServices).some(Boolean)) {
-    return unavailable(id, "GLS Paketomat / PaketShop", "GLS", serviceType, "Odabrane dodatne usluge nisu ugovorene za GLS Paketomat/PaketShop.", "manual");
+    return unavailable(id, "GLS Paketomat", "GLS", serviceType, "Odabrane dodatne usluge nisu ugovorene za GLS Paketomat.", "manual");
   }
 
   for (const item of input.packages) {
     if (item.weight > 40 || !fitsDimensions(item, [50, 50, 50])) {
-      return unavailable(id, "GLS Paketomat / PaketShop", "GLS", serviceType, "GLS Paketomat/PaketShop: paket mora biti do 40 kg i najviše 50 × 50 × 50 cm.");
+      return unavailable(id, "GLS Paketomat", "GLS", serviceType, "GLS Paketomat: paket mora biti do 40 kg i najviše 50 × 50 × 50 cm.");
     }
   }
 
@@ -444,7 +444,7 @@ export const calcGLSLocker = (input: PricingInput): PriceResult => {
   let base = 0;
   for (const item of input.packages) {
     const itemPrice = tierPrice(table, item.weight);
-    if (itemPrice === null) return unavailable(id, "GLS Paketomat / PaketShop", "GLS", serviceType, "Nema GLS Paketomat/PaketShop tarife za unesenu težinu.");
+    if (itemPrice === null) return unavailable(id, "GLS Paketomat", "GLS", serviceType, "Nema GLS Paketomat tarife za unesenu težinu.");
     base += itemPrice;
   }
 
@@ -453,7 +453,7 @@ export const calcGLSLocker = (input: PricingInput): PriceResult => {
   const codFee = input.cod ? GLS_DOMESTIC_COD : 0;
   const bankCardFee = input.cod ? input.codAmount * GLS_BANK_CARD_RATE : 0;
   const details = [
-    `${input.packages.length === 1 ? "single" : input.packages.length <= 4 ? "multi 2–4" : "multi 5+"} Paketomat/PaketShop: ${base.toFixed(2)} €`,
+    `${input.packages.length === 1 ? "single" : input.packages.length <= 4 ? "multi 2–4" : "multi 5+"} Paketomat: ${base.toFixed(2)} €`,
     `gorivo ${input.packages.length} × ${GLS_DOMESTIC_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
     `SMS po pošiljci = ${sms.toFixed(2)} €`,
   ];
@@ -464,7 +464,7 @@ export const calcGLSLocker = (input: PricingInput): PriceResult => {
 
   return {
     id,
-    name: "GLS Paketomat / PaketShop",
+    name: "GLS Paketomat",
     carrier: "GLS",
     price: round2(base + fuel + sms + codFee + bankCardFee),
     possible: true,
