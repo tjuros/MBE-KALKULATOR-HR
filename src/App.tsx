@@ -35,6 +35,14 @@ const parseNum = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const localPricingDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 type OriginLocationStatus = "idle" | "locating" | "ok" | "error";
 
 const reverseGeocodeCroatianPostalCode = async (latitude: number, longitude: number) => {
@@ -342,6 +350,7 @@ export default function App() {
   const placeOptions = useMemo(() => getPlaceOptions(postalCode), [postalCode]);
   const results = useMemo(() => isReady ? calculatePrices({
     originPostalCode,
+    pricingDate: localPricingDate(),
     destinationCountry,
     postalCode,
     destinationPlace,
