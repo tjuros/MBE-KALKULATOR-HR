@@ -45,6 +45,19 @@ export type AdditionalServices = {
   specialHandling: boolean;
 };
 
+export type CodPaymentMethod = "cash" | "card";
+
+export type InTimeOptions = {
+  smsNotification: boolean;
+  pickupAttempt: boolean;
+  nonStandard: boolean;
+  otherProvider: boolean;
+  dataCorrection: boolean;
+  proofOfDelivery: boolean;
+  returnToSender: boolean;
+  declaredValue: number;
+};
+
 export type PricingInput = {
   originPostalCode: string;
   pricingDate: string;
@@ -54,8 +67,10 @@ export type PricingInput = {
   packages: NumericPackageItem[];
   cod: boolean;
   codAmount: number;
+  codPaymentMethod: CodPaymentMethod;
   goodsValue: number;
   additionalServices: AdditionalServices;
+  inTimeOptions: InTimeOptions;
 };
 
 export type PriceResult = {
@@ -213,12 +228,16 @@ const INTIME: Record<Zone, Tier[]> = {
   ],
 };
 
-const INTIME_FUEL_SURCHARGE = 0.215; // Latest verified InTime monthly notice: 01.09.2026.
-const INTIME_FUEL_EFFECTIVE_FROM = "01.09.2026.";
+const INTIME_FUEL_SURCHARGE = 0.15; // MBE/InTime contracted price list.
 const INTIME_SEASONAL_SURCHARGE = 0.15;
-const INTIME_STANDARD_MAX_WEIGHT = 35;
-const INTIME_STANDARD_MAX_LENGTH = 175;
-const INTIME_STANDARD_MAX_GIRTH = 300;
+const INTIME_DECLARED_VALUE_RATE = 0.006;
+const INTIME_DECLARED_VALUE_THRESHOLD = 130;
+const INTIME_DECLARED_VALUE_MAX = 2000;
+const INTIME_SMS_FEE = 0.12;
+const INTIME_PICKUP_ATTEMPT_FEE = 5;
+const INTIME_OTHER_PROVIDER_FEE = 8;
+const INTIME_DATA_CORRECTION_FEE = 2;
+const INTIME_PROOF_OF_DELIVERY_FEE = 5;
 
 const inTimeSeasonalSurchargeActive = (pricingDate: string) => {
   const monthDay = pricingDate.slice(5);
@@ -857,13 +876,12 @@ export const calcInTime = (input: PricingInput): PriceResult => {
   const zone = resolveInTimeZone(input.postalCode, input.destinationPlace);
   if (!zone) return unavailable(id, "InTime", "InTime", serviceType, "InTime zona nije jednoznačna; odaberi točno mjesto ili provjeri odredište.", "manual");
 
-  const nonStandardCount = input.packages.filter((item) => {
-    const size = dimensions(item);
-    return item.weight > INTIME_STANDARD_MAX_WEIGHT
-      || size.longest > INTIME_STANDARD_MAX_LENGTH
-      || size.girth > INTIME_STANDARD_MAX_GIRTH;
-  }).length;
-  const nonStandard = nonStandardCount > 0;
+  if (input.inTimeOptions.returnToSender) {
+    return unavailable(id, "InTime", "InTime", serviceType, "Povrat pošiljatelju se prema ugovoru obračunava prema cjeniku; konačan iznos treba ručno potvrditi.", "manual");
+  }
+  if (input.inTimeOptions.declaredValue > INTIME_DECLARED_VALUE_MAX) {
+    return unavailable(id, "InTime", "InTime", serviceType, "InTime naknada za iskazanu vrijednost ugovorena je najviše do 2.000,00 €.", "manual");
+  }
 
   const actual = totalWeight(input.packages);
   const volumetric = volumeWeightInTime(input.packages);
@@ -876,33 +894,66 @@ export const calcInTime = (input: PricingInput): PriceResult => {
   const weightSurcharge = extraHundreds * base * 0.10;
   const fuel = base * INTIME_FUEL_SURCHARGE;
   const seasonal = inTimeSeasonalSurchargeActive(input.pricingDate) ? base * INTIME_SEASONAL_SURCHARGE : 0;
-  const nonStandardFee = nonStandard ? base : 0;
-  const codFee = input.cod ? Math.max(1, input.codAmount * 0.01) : 0;
+  const nonStandardFee = input.inTimeOptions.nonStandard ? base : 0;
+  const declaredValueFee = input.inTimeOptions.declaredValue > INTIME_DECLARED_VALUE_THRESHOLD
+    ? input.inTimeOptions.declaredValue * INTIME_DECLARED_VALUE_RATE
+    : 0;
+  const codFee = input.cod
+    ? input.codPaymentMethod === "card"
+      ? Math.max(2.20, input.codAmount * 0.022)
+      : Math.max(1, input.codAmount * 0.01)
+    : 0;
+  const smsFee = input.inTimeOptions.smsNotification ? INTIME_SMS_FEE : 0;
+  const pickupAttemptFee = input.inTimeOptions.pickupAttempt ? INTIME_PICKUP_ATTEMPT_FEE : 0;
+  const otherProviderFee = input.inTimeOptions.otherProvider ? INTIME_OTHER_PROVIDER_FEE : 0;
+  const dataCorrectionFee = input.inTimeOptions.dataCorrection ? INTIME_DATA_CORRECTION_FEE : 0;
+  const proofOfDeliveryFee = input.inTimeOptions.proofOfDelivery ? INTIME_PROOF_OF_DELIVERY_FEE : 0;
 
   const details = [
     `InTime zona ${zone}; obračunska masa ${chargeable.toFixed(2)} kg`,
-    `stvarna ${actual.toFixed(2)} kg / volumenska ${volumetric.toFixed(2)} kg (1 m³ = 200 kg)`,
+    `stvarna ${actual.toFixed(2)} kg / volumenska ${volumetric.toFixed(2)} kg (D × Š × V × 200 kg/m³)`,
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${(INTIME_FUEL_SURCHARGE * 100).toFixed(1).replace(".", ",")}% (od ${INTIME_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`,
+    `gorivo 15% = ${fuel.toFixed(2)} €`,
   ];
   if (weightSurcharge) details.push(`iznad 3.000 kg: ${extraHundreds} × 10% osnovne cijene = ${weightSurcharge.toFixed(2)} €`);
   if (seasonal) details.push(`sezonski dodatak 15% (1.11.–31.12.) = ${seasonal.toFixed(2)} €`);
-  if (nonStandard) details.push(`nestandardna pošiljka +100% osnovne cijene = ${nonStandardFee.toFixed(2)} € (${nonStandardCount} nestandardnih koleta)`);
-  if (input.cod) {
-    details.push(`COD gotovina 1%, min 1,00 € = ${codFee.toFixed(2)} €`);
-    details.push(`COD kartica: 2,20%, min 2,20 € (nije uključeno u ukupni izračun)`);
-  }
+  if (input.inTimeOptions.nonStandard) details.push(`nestandardna pošiljka / volumetrija nije primjenjiva: +100% osnovne cijene = ${nonStandardFee.toFixed(2)} €`);
+  if (declaredValueFee) details.push(`iskazana vrijednost ${input.inTimeOptions.declaredValue.toFixed(2)} € × 0,60% = ${declaredValueFee.toFixed(2)} €`);
+  if (input.cod) details.push(
+    input.codPaymentMethod === "card"
+      ? `COD kartica 2,20%, min 2,20 € = ${codFee.toFixed(2)} €`
+      : `COD gotovina 1%, min 1,00 € = ${codFee.toFixed(2)} €`
+  );
+  if (smsFee) details.push(`SMS status +${smsFee.toFixed(2)} €`);
+  if (pickupAttemptFee) details.push(`pokušaj preuzimanja +${pickupAttemptFee.toFixed(2)} €`);
+  if (otherProviderFee) details.push(`isporuka putem drugog pružatelja +${otherProviderFee.toFixed(2)} €`);
+  if (dataCorrectionFee) details.push(`naknadni ispravak podataka +${dataCorrectionFee.toFixed(2)} €`);
+  if (proofOfDeliveryFee) details.push(`potvrda o isporuci +${proofOfDeliveryFee.toFixed(2)} €`);
 
-  const optional = addOptionalServices(base + weightSurcharge + fuel + seasonal + nonStandardFee + codFee, input, {
+  const beforeCommonAddOns = base + weightSurcharge + fuel + seasonal + nonStandardFee + declaredValueFee
+    + codFee + smsFee + pickupAttemptFee + otherProviderFee + dataCorrectionFee + proofOfDeliveryFee;
+  const optional = addOptionalServices(beforeCommonAddOns, input, {
     documentReturn: 10,
     addresseeOnly: 2.55,
   }, details);
   if (optional.unsupported) return unavailable(id, "InTime", "InTime", serviceType, `InTime: ${optional.unsupported} nema izravno primjenjivu ugovorenu cijenu.`, "manual");
 
+  const anyContractExtra = weightSurcharge > 0
+    || seasonal > 0
+    || input.inTimeOptions.nonStandard
+    || declaredValueFee > 0
+    || input.cod
+    || smsFee > 0
+    || pickupAttemptFee > 0
+    || otherProviderFee > 0
+    || dataCorrectionFee > 0
+    || proofOfDeliveryFee > 0
+    || Object.values(input.additionalServices).some(Boolean);
+
   const warnings: string[] = [];
-  if (nonStandard) warnings.push("Nestandardna pošiljka prema aktualnom InTime standardu (35 kg / 175 cm / kombinirane dimenzije 300 cm); primijenjena je ugovorna naknada +100% osnovne cijene.");
-  if (input.cod) warnings.push("Ukupna cijena računa gotovinski COD. Za kartično plaćanje InTime naplaćuje 2,20% iznosa, minimalno 2,20 €.");
-  if (zone === 3) warnings.push("Moguća je dodatna naknada 8,00 € kada InTime koristi drugog pružatelja; popis tih odredišta nije dostavljen i iznos nije automatski dodan.");
+  if (input.inTimeOptions.nonStandard) warnings.push("Ugovorna naknada +100% primjenjuje se kada obračun volumenske težine nije primjenjiv.");
+  if (input.inTimeOptions.declaredValue > 0 && input.inTimeOptions.declaredValue <= INTIME_DECLARED_VALUE_THRESHOLD) warnings.push("Naknada za iskazanu vrijednost počinje iznad 130,00 €.");
+  if (proofOfDeliveryFee) warnings.push("Potvrda o isporuci dostavlja se isključivo elektronički putem e-pošte.");
 
   return {
     id,
@@ -912,7 +963,7 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     possible: true,
     details,
     serviceType,
-    status: nonStandard || weightSurcharge > 0 || seasonal > 0 || input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
+    status: anyContractExtra ? "surcharge" : "ok",
     warning: warnings.length ? warnings.join(" ") : undefined,
   };
 };
