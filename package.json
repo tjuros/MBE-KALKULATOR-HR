@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "npm run test:pricing && vite build",
     "test:pricing": "node --import tsx scripts/golden-pricing.ts"
   },
   "dependencies": {

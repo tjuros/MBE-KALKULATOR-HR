@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import { calculatePrices, exportCodCarriers, type NumericPackageItem, type PricingInput, type PricingResults } from "../src/pricing";
 import { DESTINATION_COUNTRIES } from "../src/upsTariffs";
+import { DPD_ROAD_FUEL_PER_PACKAGE, FUEL_CONFIG } from "../src/fuelConfig";
+
+assert.equal(FUEL_CONFIG.overseas.rate, 0.08);
+assert.equal(FUEL_CONFIG.gls.domesticPerPackage, 0.44);
+assert.equal(FUEL_CONFIG.gls.exportRate, 0.132);
+assert.equal(DPD_ROAD_FUEL_PER_PACKAGE, 0.50);
+assert.equal(FUEL_CONFIG.schenker.rate, 0.09);
+assert.equal(FUEL_CONFIG.intime.rate, 0.15);
+assert.equal(FUEL_CONFIG.lagermax.rate, 0.066);
+assert.equal(FUEL_CONFIG.ups.standardRate, 0.34);
+assert.equal(FUEL_CONFIG.ups.expressRate, 0.5325);
+assert.equal(FUEL_CONFIG.boxNow.rate, 0);
+assert.equal(FUEL_CONFIG.hp.rate, 0);
 
 const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling: false };
 const noInTimeOptions = {
@@ -219,6 +232,7 @@ assert.equal(find(hpLockerLarge, "hp-paketomat").possible, false);
 
 const hpSensitive = calculatePrices(shipment({
   postalCode: "10000",
+  packages: [box(1, 20, 15, 10)],
   additionalServices: { ...noExtras, specialHandling: true },
 }));
 price(hpSensitive, "hp-paket24", 4.27);

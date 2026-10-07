@@ -1,6 +1,7 @@
 // Generated from MBE UPS cjenik 2026, pages 3-4, 7-8 and 16.
 // Package rates are used for all shipments; document and envelope rates are intentionally excluded.
 import { EXPORT_COUNTRIES, type ExportRegion } from "./exportTariffs";
+import { FUEL_CONFIG } from "./fuelConfig";
 
 export type UpsTier = { max: number; price: number };
 export type UpsOverWeightRate = { perKg: number; minimum: number };
@@ -17,10 +18,10 @@ export type UpsCountry = {
   specialSaver: "BALKANS" | null;
 };
 
-// UPS Croatia fuel surcharge, effective 5 October 2026.
-export const UPS_FUEL_EFFECTIVE_FROM = "05.10.2026.";
-export const UPS_EXPRESS_SAVER_FUEL = 0.5325;
-export const UPS_STANDARD_FUEL = 0.34;
+// UPS fuel values are maintained centrally in fuelConfig.ts.
+export const UPS_FUEL_EFFECTIVE_FROM = FUEL_CONFIG.ups.effectiveFrom;
+export const UPS_EXPRESS_SAVER_FUEL = FUEL_CONFIG.ups.expressRate;
+export const UPS_STANDARD_FUEL = FUEL_CONFIG.ups.standardRate;
 export const UPS_ADDITIONAL_HANDLING = 13.2;
 export const UPS_LARGE_PACKAGE = 54.75;
 export const UPS_OVER_MAXIMUM = 346.95;
