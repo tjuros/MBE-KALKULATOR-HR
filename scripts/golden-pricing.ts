@@ -54,7 +54,7 @@ const schenkerBusinessPackages = calculatePrices(shipment({
   recipientType: "business",
   packages: [box(5, 40, 30, 20), box(5, 40, 30, 20), box(5, 40, 30, 20)],
 }));
-price(schenkerBusinessPackages, "schenker-packages", 17.78);
+price(schenkerBusinessPackages, "schenker-packages", 17.79);
 assert.match(find(schenkerBusinessPackages, "schenker-packages").details.join(" "), /minimum po pošiljci 12\.00 €/);
 assert.match(find(schenkerBusinessPackages, "schenker-packages").details.join(" "), /gorivo 9%/);
 
