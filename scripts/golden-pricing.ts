@@ -5,6 +5,7 @@ import { DESTINATION_COUNTRIES } from "../src/upsTariffs";
 const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling: false };
 const box = (weight: number, length: number, width: number, height: number): NumericPackageItem => ({ weight, length, width, height });
 const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
+  originPostalCode: "48260",
   destinationCountry: "Croatia",
   postalCode: "10000",
   destinationPlace: "",
@@ -42,6 +43,20 @@ price(virovitica, "lagermax", 30.91);
 price(virovitica, "intime", 43.01);
 assert.equal(find(virovitica, "box-now").possible, false);
 assert.match(find(virovitica, "lagermax").details[0], /Z1 → Z2.*skuplja Z2/);
+
+const lagermaxFromSplit = calculatePrices(shipment({
+  originPostalCode: "21000",
+  postalCode: "10000",
+}));
+price(lagermaxFromSplit, "lagermax", 13.86);
+assert.match(find(lagermaxFromSplit, "lagermax").details[0], /Z2 → Z1.*skuplja Z2/);
+
+const lagermaxMissingOrigin = calculatePrices(shipment({
+  originPostalCode: "",
+  postalCode: "10000",
+}));
+assert.equal(find(lagermaxMissingOrigin, "lagermax").status, "manual");
+assert.match(find(lagermaxMissingOrigin, "lagermax").details.join(" "), /poštanski broj polazišta/);
 
 const korcula = calculatePrices(shipment({
   postalCode: "20260",

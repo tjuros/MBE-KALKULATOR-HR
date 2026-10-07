@@ -35,6 +35,38 @@ const parseNum = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+type OriginLocationStatus = "idle" | "locating" | "ok" | "error";
+
+const reverseGeocodeCroatianPostalCode = async (latitude: number, longitude: number) => {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    lat: latitude.toString(),
+    lon: longitude.toString(),
+    addressdetails: "1",
+    zoom: "16",
+  });
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: { Accept: "application/json", "Accept-Language": "hr" },
+  });
+  if (!response.ok) throw new Error("reverse-geocode");
+  const data = await response.json() as {
+    address?: {
+      postcode?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+      country_code?: string;
+    };
+  };
+  const countryCode = data.address?.country_code?.toUpperCase();
+  if (countryCode && countryCode !== "HR") throw new Error("outside-croatia");
+  const postalCode = data.address?.postcode?.match(/\b\d{5}\b/)?.[0] ?? "";
+  if (!postalCode) throw new Error("postal-code-missing");
+  const place = data.address?.city ?? data.address?.town ?? data.address?.village ?? data.address?.municipality ?? "";
+  return { postalCode, place };
+};
+
 const money = (value: number | null) => value === null
   ? "—"
   : new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(value);
@@ -219,6 +251,12 @@ function ChoiceCard({ label, result }: { label: ServiceType; result: PriceResult
 
 export default function App() {
   const isMobile = useIsMobile();
+  const [originPostalCode, setOriginPostalCode] = useState(() =>
+    typeof window !== "undefined" ? window.localStorage.getItem("mbe-origin-postal-code") ?? "" : ""
+  );
+  const [originLocationLabel, setOriginLocationLabel] = useState("");
+  const [originLocationStatus, setOriginLocationStatus] = useState<OriginLocationStatus>("idle");
+  const [originLocationMessage, setOriginLocationMessage] = useState("");
   const [destinationCountry, setDestinationCountry] = useState("Croatia");
   const [postalCode, setPostalCode] = useState("");
   const [destinationPlace, setDestinationPlace] = useState("");
@@ -248,6 +286,53 @@ export default function App() {
     }
   }, [codAvailable, cod]);
 
+  const locateOriginFromBrowser = () => {
+    if (!navigator.geolocation) {
+      setOriginLocationStatus("error");
+      setOriginLocationMessage("Preglednik ne podržava dohvat lokacije. Upiši poštanski broj ručno.");
+      return;
+    }
+    setOriginLocationStatus("locating");
+    setOriginLocationMessage("Dohvaćam lokaciju…");
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const detected = await reverseGeocodeCroatianPostalCode(coords.latitude, coords.longitude);
+          setOriginPostalCode(detected.postalCode);
+          setOriginLocationLabel(detected.place);
+          setOriginLocationStatus("ok");
+          setOriginLocationMessage(`Lokacija preglednika: ${detected.postalCode}${detected.place ? ` ${detected.place}` : ""}`);
+        } catch (error) {
+          setOriginLocationStatus("error");
+          setOriginLocationMessage(error instanceof Error && error.message === "outside-croatia"
+            ? "Lokacija preglednika nije u Hrvatskoj. Upiši poštanski broj polazišta ručno."
+            : "Nisam mogao odrediti poštanski broj iz lokacije. Upiši ga ručno.");
+        }
+      },
+      (error) => {
+        setOriginLocationStatus("error");
+        setOriginLocationMessage(error.code === error.PERMISSION_DENIED
+          ? "Pristup lokaciji nije dopušten. Upiši poštanski broj polazišta ručno."
+          : "Lokaciju nije moguće dohvatiti. Upiši poštanski broj polazišta ručno.");
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 60 * 1000 },
+    );
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (originPostalCode.length === 5) window.localStorage.setItem("mbe-origin-postal-code", originPostalCode);
+      else window.localStorage.removeItem("mbe-origin-postal-code");
+    }
+  }, [originPostalCode]);
+
+  useEffect(() => {
+    if (originPostalCode || !navigator.geolocation || !navigator.permissions) return;
+    navigator.permissions.query({ name: "geolocation" }).then((permission) => {
+      if (permission.state === "granted") locateOriginFromBrowser();
+    }).catch(() => undefined);
+  }, []);
+
   const isReady = useMemo(() => (!isDomestic || postalCode.length === 5)
     && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
     && (!cod || (parseNum(codAmount) ?? 0) > 0)
@@ -256,6 +341,7 @@ export default function App() {
 
   const placeOptions = useMemo(() => getPlaceOptions(postalCode), [postalCode]);
   const results = useMemo(() => isReady ? calculatePrices({
+    originPostalCode,
     destinationCountry,
     postalCode,
     destinationPlace,
@@ -264,7 +350,7 @@ export default function App() {
     codAmount: parseNum(codAmount) ?? 0,
     goodsValue: parseNum(goodsValue) ?? 0,
     additionalServices: DEFAULT_ADDITIONAL_SERVICES,
-  }) : null, [isReady, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue]);
+  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -309,6 +395,39 @@ export default function App() {
             <button style={{ ...buttonStyle(), minHeight: 38, padding: "8px 12px" }} onClick={resetShipment}>Reset</button>
           </div>
         </header>
+
+        <div style={{ ...cardStyle(), padding: "12px 14px", background: "#fff" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 10, alignItems: "end" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 900 }}>Polazište · poštanski broj</label>
+              <input
+                inputMode="numeric"
+                value={originPostalCode}
+                onChange={(event) => {
+                  setOriginPostalCode(event.target.value.replace(/\D/g, "").slice(0, 5));
+                  setOriginLocationLabel("");
+                  setOriginLocationStatus("idle");
+                  setOriginLocationMessage("");
+                }}
+                placeholder="npr. 48260"
+                style={inputStyle()}
+              />
+            </div>
+            <button
+              type="button"
+              style={{ ...buttonStyle(), minHeight: 50, whiteSpace: "nowrap" }}
+              onClick={locateOriginFromBrowser}
+              disabled={originLocationStatus === "locating"}
+            >
+              {originLocationStatus === "locating" ? "Dohvaćam…" : "Koristi moju lokaciju"}
+            </button>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.4, color: originLocationStatus === "error" ? "#b91c1c" : "#64748b" }}>
+            {originLocationMessage || (originPostalCode
+              ? `Polazište: ${originPostalCode}${originLocationLabel ? ` ${originLocationLabel}` : ""}. Koristi se za Lagermax i paletne zone.`
+              : "Poštanski broj možeš upisati ručno ili dopustiti pregledniku dohvat lokacije. Koristi se za Lagermax i paletne zone.")}
+          </div>
+        </div>
 
         <div style={{ ...cardStyle(), padding: "12px 14px", background: "#fff" }}>
           <label style={{ display: "block", marginBottom: 6, fontWeight: 900 }}>Destination country</label>
@@ -479,6 +598,7 @@ export default function App() {
               </div>
             ) : null}
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
+              <div>Polazište: <strong>{originPostalCode || "—"}</strong></div>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
               {isWorldwide ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
