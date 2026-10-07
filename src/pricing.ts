@@ -1320,15 +1320,19 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   };
 };
 
+const BOX_NOW_BASE_PRICE = 1.40;
+const BOX_NOW_CARD_COD_RATE = 0.01;
+const BOX_NOW_L_NETWORK_SURCHARGE = 1.20;
+const BOX_NOW_L_THRESHOLD = 0.05;
+const BOX_NOW_LIABILITY_LIMIT = 200;
+
 export const calcBoxNow = (input: PricingInput): PriceResult => {
   const id = "box-now";
   const serviceType: ServiceType = "MBE Paketomati";
   if (Object.values(input.additionalServices).some(Boolean)) {
     return unavailable(id, "BOX NOW", "BOX NOW", serviceType, "Povrat dokumenta, osobno uručenje i posebno rukovanje nisu dio BOX NOW paketomat usluge.");
   }
-  if (input.cod && input.codAmount > 200) {
-    return unavailable(id, "BOX NOW", "BOX NOW", serviceType, "Ugovorena maksimalna vrijednost BOX NOW pošiljke je 200 €.");
-  }
+
   let largeCount = 0;
   for (const item of input.packages) {
     if (item.weight <= 2 && fitsDimensions(item, [8, 45, 60])) continue;
@@ -1339,12 +1343,27 @@ export const calcBoxNow = (input: PricingInput): PriceResult => {
     }
     return unavailable(id, "BOX NOW", "BOX NOW", serviceType, "Najmanje jedan paket ne stane u pretinac L (20 kg; 36 × 45 × 60 cm).");
   }
-  const base = 1.4 * input.packages.length;
-  const codFee = input.cod ? input.codAmount * 0.01 : 0;
-  const contingency = largeCount * 1.2;
-  const details = [`${input.packages.length} × 1,40 € = ${base.toFixed(2)} €`];
+
+  const base = BOX_NOW_BASE_PRICE * input.packages.length;
+  const codFee = input.cod ? input.codAmount * BOX_NOW_CARD_COD_RATE : 0;
+  const contingency = largeCount * BOX_NOW_L_NETWORK_SURCHARGE;
+  const details = [
+    `${input.packages.length} × ${BOX_NOW_BASE_PRICE.toFixed(2)} € = ${base.toFixed(2)} €`,
+    "gorivo: nema dodatka",
+    `ugovorna odgovornost/naknada za gubitak ili oštećenje do ${BOX_NOW_LIABILITY_LIMIT.toFixed(2)} € po paketu`,
+  ];
   if (input.cod) details.push(`online COD karticom 1% = ${codFee.toFixed(2)} €`);
   if (largeCount) details.push(`${largeCount} L paket(a); moguća mrežna nadoplata do ${contingency.toFixed(2)} €`);
+
+  const warnings: string[] = [];
+  if (input.cod) warnings.push("BOX NOW COD se plaća karticom/online; odabir gotovine u formi ne mijenja BOX NOW obračun.");
+  if (largeCount) warnings.push(
+    `Prikazana je osnovna cijena. Ako mrežni udio L paketa prijeđe ${(BOX_NOW_L_THRESHOLD * 100).toFixed(0)}% kroz ugovoreno promatrano razdoblje, cijena se može povećati za ${BOX_NOW_L_NETWORK_SURCHARGE.toFixed(2)} € po L paketu.`
+  );
+  if (Math.max(input.codAmount, input.goodsValue) > BOX_NOW_LIABILITY_LIMIT) {
+    warnings.push(`Vrijednost/COD može biti viši od ${BOX_NOW_LIABILITY_LIMIT.toFixed(2)} €, ali ugovorni limit naknade štete/gubitka ostaje ${BOX_NOW_LIABILITY_LIMIT.toFixed(2)} € po paketu.`);
+  }
+
   return {
     id,
     name: "BOX NOW",
@@ -1353,8 +1372,8 @@ export const calcBoxNow = (input: PricingInput): PriceResult => {
     possible: true,
     details,
     serviceType,
-    status: largeCount ? "surcharge" : "ok",
-    warning: largeCount ? `Prikazana je osnovna cijena. Ako mreža prijeđe ugovorni prag od 5% L paketa kroz dva puna mjeseca, cijena može porasti na ${round2(base + codFee + contingency).toFixed(2)} €.` : undefined,
+    status: input.cod || largeCount ? "surcharge" : "ok",
+    warning: warnings.length ? warnings.join(" ") : undefined,
   };
 };
 

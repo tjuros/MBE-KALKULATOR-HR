@@ -123,6 +123,8 @@ const osijekCod = calculatePrices(shipment({
   codAmount: 40,
 }));
 price(osijekCod, "box-now", 1.8);
+assert.match(find(osijekCod, "box-now").details.join(" "), /gorivo: nema dodatka/);
+assert.match(find(osijekCod, "box-now").warning ?? "", /COD se plaća karticom/);
 price(osijekCod, "hp-paket24", 2.7);
 price(osijekCod, "hp-paketomat", 2.05);
 assert.match(find(osijekCod, "hp-paketomat").details.join(" "), /plaćanje pouzećem uključeno/);
@@ -138,6 +140,16 @@ assert.match(find(osijekCod, "gls-express").warning ?? "", /1% iznosa pouzeća/)
 price(osijekCod, "intime", 5.49);
 assert.equal(osijekCod.overallWinner?.id, "box-now", "BOX NOW remains the absolute cheapest transport option");
 assert.equal(osijekCod.recommendedWinner?.id, "hp-paket24", "Recommendation must stay within MBE Economy");
+
+
+const boxNowHighCod = calculatePrices(shipment({
+  postalCode: "10000",
+  cod: true,
+  codAmount: 500,
+  packages: [box(1, 30, 20, 5)],
+}));
+price(boxNowHighCod, "box-now", 6.40);
+assert.match(find(boxNowHighCod, "box-now").warning ?? "", /limit naknade.*200\.00 €/);
 
 const zagrebBulk = calculatePrices(shipment({
   postalCode: "10000",
