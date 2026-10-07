@@ -539,16 +539,18 @@ export default function App() {
                 </div>
               ) : null}
 
-              {isDomestic ? (
-                <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Primatelj</label>
-                  <select value={recipientType} onChange={(event) => setRecipientType(event.target.value as RecipientType)} style={inputStyle()}>
-                    <option value="private">Fizička osoba</option>
-                    <option value="business">Pravna osoba / poslovni primatelj</option>
-                  </select>
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Schenker ugovorene paketne i paletne cijene vrijede samo za poslovne primatelje.</div>
+              <div>
+                <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Primatelj</label>
+                <select value={recipientType} onChange={(event) => setRecipientType(event.target.value as RecipientType)} style={inputStyle()}>
+                  <option value="private">Fizička osoba</option>
+                  <option value="business">Pravna osoba / poslovni primatelj</option>
+                </select>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>
+                  {isDomestic
+                    ? "Schenker ugovorene paketne i paletne cijene vrijede samo za poslovne primatelje."
+                    : "UPS za dostavu na privatnu adresu obračunava Residential Delivery nadoplatu."}
                 </div>
-              ) : null}
+              </div>
 
               <div>
                 <div style={{ fontWeight: 900, marginBottom: 7, fontSize: isMobile ? 16 : 18 }}>Paket 1</div>
