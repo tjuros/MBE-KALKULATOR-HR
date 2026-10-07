@@ -6,6 +6,7 @@ const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling:
 const box = (weight: number, length: number, width: number, height: number): NumericPackageItem => ({ weight, length, width, height });
 const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
   originPostalCode: "48260",
+  pricingDate: "2026-10-07",
   destinationCountry: "Croatia",
   postalCode: "10000",
   destinationPlace: "",
@@ -40,7 +41,7 @@ assert.match(find(virovitica, "overseas-multi").details.join(" "), /gorivo 8%/);
 price(virovitica, "dpd-standard", 6.78);
 price(virovitica, "gls-express", 10.62);
 price(virovitica, "lagermax", 30.91);
-price(virovitica, "intime", 43.01);
+price(virovitica, "intime", 45.44);
 assert.equal(find(virovitica, "box-now").possible, false);
 assert.match(find(virovitica, "lagermax").details[0], /Z1 → Z2.*skuplja Z2/);
 
@@ -65,7 +66,7 @@ const korcula = calculatePrices(shipment({
 price(korcula, "hp-paket24", 5.45);
 price(korcula, "dpd-standard", 13.78);
 price(korcula, "gls-express", 10.62);
-price(korcula, "intime", 51.98);
+price(korcula, "intime", 54.92);
 price(korcula, "lagermax", 62.64);
 assert.equal(find(korcula, "overseas-multi").possible, false, "Overseas Cargo is not available for 20260");
 
@@ -87,7 +88,7 @@ price(osijekCod, "gls-express", 4.67);
 price(osijekCod, "gls-locker", 3.74);
 assert.match(find(osijekCod, "gls-locker").details.join(" "), /kartično plaćanje COD 1% = 0\.40 €/);
 assert.match(find(osijekCod, "gls-express").warning ?? "", /1% iznosa pouzeća/);
-price(osijekCod, "intime", 5.49);
+price(osijekCod, "intime", 5.74);
 assert.equal(osijekCod.overallWinner?.id, "box-now", "BOX NOW remains the absolute cheapest transport option");
 assert.equal(osijekCod.recommendedWinner?.id, "hp-paket24", "Recommendation must stay within MBE Economy");
 
@@ -100,7 +101,7 @@ price(zagrebBulk, "hp-paleta", 30.56);
 price(zagrebBulk, "hp-paket24", 41.8);
 price(zagrebBulk, "overseas-multi", 44.22);
 price(zagrebBulk, "dpd-standard", 61.02);
-price(zagrebBulk, "intime", 63.02);
+price(zagrebBulk, "intime", 66.58);
 price(zagrebBulk, "gls-express", 88.5);
 price(zagrebBulk, "lagermax", 89.54);
 
@@ -176,11 +177,31 @@ const longInTimeShipment = calculatePrices(shipment({
   postalCode: "10000",
   packages: [box(10, 310, 10, 10)],
 }));
-price(longInTimeShipment, "intime", 11.98);
+price(longInTimeShipment, "intime", 12.34);
 assert.equal(find(longInTimeShipment, "intime").status, "surcharge");
 assert.match(find(longInTimeShipment, "intime").details.join(" "), /nestandardna pošiljka \+100%/);
-assert.match(find(longInTimeShipment, "intime").warning ?? "", /prethodni dogovor i potvrdu InTimea/);
+assert.match(find(longInTimeShipment, "intime").warning ?? "", /35 kg \/ 175 cm \/ kombinirane dimenzije 300 cm/);
 assert.equal(longInTimeShipment.recommendedWinner?.id, "intime");
+
+
+const inTimeStandard175 = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(10, 175, 10, 10)],
+}));
+assert.doesNotMatch(find(inTimeStandard175, "intime").details.join(" "), /nestandardna pošiljka/);
+
+const inTimeOversize176 = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(10, 176, 10, 10)],
+}));
+assert.match(find(inTimeOversize176, "intime").details.join(" "), /nestandardna pošiljka \+100%/);
+
+const inTimeSeasonal = calculatePrices(shipment({
+  pricingDate: "2026-11-15",
+  postalCode: "10000",
+}));
+price(inTimeSeasonal, "intime", 5.32);
+assert.match(find(inTimeSeasonal, "intime").details.join(" "), /sezonski dodatak 15%/);
 
 const austria = calculatePrices(shipment({
   destinationCountry: "Austria",
