@@ -91,6 +91,8 @@ const osijekCod = calculatePrices(shipment({
 }));
 price(osijekCod, "box-now", 1.8);
 price(osijekCod, "hp-paket24", 2.7);
+price(osijekCod, "hp-paketomat", 2.05);
+assert.match(find(osijekCod, "hp-paketomat").details.join(" "), /plaćanje pouzećem uključeno/);
 price(osijekCod, "dpd-standard", 2.89);
 assert.match(find(osijekCod, "dpd-standard").details.join(" "), /09\/2026 \(1\.96 €\/l\).*0\.50 €/);
 assert.match(find(osijekCod, "dpd-standard").warning ?? "", /karticom\/online/);
@@ -110,8 +112,8 @@ const zagrebBulk = calculatePrices(shipment({
 }));
 price(zagrebBulk, "box-now", 25.2);
 price(zagrebBulk, "hp-paleta", 30.56);
-assert.match(find(zagrebBulk, "hp-paleta").name, /Žurna paleta/);
-assert.match(find(zagrebBulk, "hp-paleta").details.join(" "), /rok do D\+4/);
+assert.match(find(zagrebBulk, "hp-paleta").name, /HP Paleta/);
+assert.match(find(zagrebBulk, "hp-paleta").details.join(" "), /rok uručenja D\+5/);
 assert.match(find(zagrebBulk, "hp-paket24").details.join(" "), /do 31\.10\.2026/);
 price(zagrebBulk, "hp-paket24", 41.8);
 price(zagrebBulk, "overseas-multi", 44.22);
@@ -162,6 +164,20 @@ const hpPallet180 = calculatePrices(shipment({
   packages: [box(35, 80, 70, 180)],
 }));
 price(hpPallet180, "hp-paleta", 30.56);
+
+
+const hpLockerLarge = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(1, 65, 38, 39)],
+}));
+assert.equal(find(hpLockerLarge, "hp-paketomat").possible, false);
+
+const hpSensitive = calculatePrices(shipment({
+  postalCode: "10000",
+  additionalServices: { ...noExtras, specialHandling: true },
+}));
+price(hpSensitive, "hp-paket24", 4.27);
+assert.match(find(hpSensitive, "hp-paket24").details.join(" "), /posebno rukovanje \+2\.07 €/);
 
 const hpExpiredTariff = calculatePrices(shipment({
   pricingDate: "2026-11-01",
