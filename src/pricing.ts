@@ -1511,33 +1511,57 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
   };
 };
 
+const hpEmsValueSurcharge = (value: number) => {
+  if (value <= 165) return 0;
+  if (value <= 390) return 6.00;
+  if (value <= 660) return 10.40;
+  if (value <= 920) return 14.00;
+  if (value <= 1330) return 20.00;
+  return null;
+};
+
 export const calcHPExport = (input: PricingInput, tariff: ExportCountryTariff): PriceResult => {
   const id = "hp-ems";
   const serviceType: ServiceType = "MBE Economy";
   if (!tariff.hp.length) return unavailable(id, "HP EMS", "HP", serviceType, `HP EMS nema ulaznu tarifu za ${tariff.label}.`);
-  if (input.cod) return unavailable(id, "HP EMS", "HP", serviceType, "Pouzeće nije ugovoreno za HP EMS.");
-  if (input.additionalServices.addresseeOnly) {
-    return unavailable(id, "HP EMS", "HP", serviceType, "Osobno uručenje nema ugovorenu HP EMS cijenu.", "manual");
+  if (input.cod) return unavailable(id, "HP EMS", "HP", serviceType, "Pouzeće nije navedeno kao dopunska usluga uz Paket24 International (EMS).");
+  if (input.additionalServices.addresseeOnly || input.additionalServices.specialHandling) {
+    return unavailable(id, "HP EMS", "HP", serviceType, "Osobno uručenje / osjetljiv sadržaj nisu navedeni kao dopunske usluge uz EMS; potrebna je ručna provjera.", "manual");
   }
+
   for (const item of input.packages) {
     const size = dimensions(item);
+    const sorted = [item.length, item.width, item.height].sort((a, b) => b - a);
+    if (sorted[0] < 25 || sorted[1] < 17.6) {
+      return unavailable(id, "HP EMS", "HP", serviceType, "HP EMS: najmanje dimenzije pošiljke su 17,6 × 25,0 cm.");
+    }
     if (item.weight > 30 || size.longest > 150 || size.girth > 300) {
-      return unavailable(id, "HP EMS", "HP", serviceType, "HP EMS cjenik: najviše 30 kg, duljina 150 cm i opseg 300 cm po paketu.", "manual");
+      return unavailable(id, "HP EMS", "HP", serviceType, "Automatski EMS cjenik je dostavljen do 30 kg; najveća stranica je 150 cm, a duljina + opseg 300 cm. Za odstupanja je potrebna ručna provjera.", "manual");
     }
   }
-  if (tariff.region === "WW" && input.goodsValue > 1000) {
-    return unavailable(id, "HP EMS", "HP", serviceType, "HP EMS carinski dodatak za vrijednost robe iznad 1.000 € nije naveden; potrebna je ručna provjera.", "manual");
+
+  const valueSurcharge = hpEmsValueSurcharge(input.goodsValue);
+  if (valueSurcharge === null) {
+    return unavailable(id, "HP EMS", "HP", serviceType, "Označena vrijednost Paket24 International (EMS) može biti najviše 1.330,00 €.", "manual");
   }
+
   const base = exportBase(tariff.hp, input.packages);
   if (base === null) return unavailable(id, "HP EMS", "HP", serviceType, "Nema HP EMS tarife za unesenu težinu.");
-  const customs = tariff.region === "WW" ? (input.goodsValue <= 150 ? 1.97 : 3.93) : 0;
-  const details = [`osnovna EMS tarifa ${base.toFixed(2)} €`, "nema dodatka za gorivo"];
-  if (customs) details.push(`carinski dodatak +${customs.toFixed(2)} €`);
-  const optional = addOptionalServices(base + customs, input, {
-    documentReturn: 1.7 * input.packages.length,
-    specialHandling: 1.6 * input.packages.length,
+
+  const details = [
+    `osnovna EMS tarifa ${base.toFixed(2)} €`,
+    "nema dodatka za gorivo",
+    "osigurana vrijednost do 165,00 € uključena u osnovnu cijenu",
+  ];
+  if (valueSurcharge) details.push(`dodatak na označenu vrijednost ${input.goodsValue.toFixed(2)} € = ${valueSurcharge.toFixed(2)} €`);
+  if (!input.goodsValue) details.push("ako je vrijednost robe iznad 165,00 €, upiši je radi dodatka na označenu vrijednost");
+  details.push("ručna obrada EMS-a, ako je potrebna, iznosi 1,60 € i nije automatski uključena");
+
+  const optional = addOptionalServices(base + valueSurcharge, input, {
+    documentReturn: 1.70 * input.packages.length,
   }, details);
-  if (optional.unsupported) return unavailable(id, "HP EMS", "HP", serviceType, `HP EMS: ${optional.unsupported} nije ugovoreno.`, "manual");
+  if (optional.unsupported) return unavailable(id, "HP EMS", "HP", serviceType, `HP EMS: ${optional.unsupported} nije ugovoreno / navedeno za EMS.`, "manual");
+
   return {
     id,
     name: "HP EMS",
@@ -1546,7 +1570,8 @@ export const calcHPExport = (input: PricingInput, tariff: ExportCountryTariff): 
     possible: true,
     details,
     serviceType,
-    status: customs || exportAddOnSelected(input) ? "surcharge" : "ok",
+    status: valueSurcharge || exportAddOnSelected(input) ? "surcharge" : "ok",
+    warning: "Paket24 International (EMS): cijene su bez PDV-a; za odredišta izvan EU carina, PDV i ostala javna davanja u odredištu nisu uključeni.",
   };
 };
 

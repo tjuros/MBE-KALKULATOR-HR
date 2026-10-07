@@ -512,11 +512,11 @@ export default function App() {
                 </div>
               ) : null}
 
-              {isWorldwide ? (
+              {!isDomestic ? (
                 <div>
                   <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Vrijednost robe (€)</label>
                   <input {...commonInputProps} type="text" inputMode="decimal" value={goodsValue} onChange={(event) => setGoodsValue(event.target.value)} placeholder="bez PDV-a" style={inputStyle()} />
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Potrebno za točan obračun carinskih dodataka.</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Za zemlje izvan EU obavezno; za EU je korisno za HP EMS jer je vrijednost do 165 € uključena, a viša se dodatno naplaćuje.</div>
                 </div>
               ) : null}
 
@@ -735,9 +735,9 @@ export default function App() {
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
               <div>Polazište: <strong>{originPostalCode || "—"}</strong></div>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
-              {isDomestic ? <div>Primatelj: <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div> : null}
+              <div>Primatelj: <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div>
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
-              {isWorldwide ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
+              {!isDomestic ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "nije unesena"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
               <div>Stvarna masa: <strong>{metrics.actualWeight.toFixed(2)} kg</strong></div>
               {isDomestic ? <div>InTime volumenska masa: <strong>{metrics.inTimeVolumetricWeight.toFixed(2)} kg</strong></div> : null}
