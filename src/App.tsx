@@ -591,6 +591,15 @@ export default function App() {
                       Osobno uručenje
                     </label>
 
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={additionalServices.specialHandling}
+                        onChange={(event) => setAdditionalServices((current) => ({ ...current, specialHandling: event.target.checked }))}
+                      />
+                      Osjetljiv sadržaj / posebno rukovanje
+                    </label>
+
                     <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px solid #e2e8f0", fontWeight: 900 }}>InTime ugovorne stavke</div>
                     <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input type="checkbox" checked={inTimeOptions.smsNotification} onChange={(event) => setInTimeOptions((current) => ({ ...current, smsNotification: event.target.checked }))} />
