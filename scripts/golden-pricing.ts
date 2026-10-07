@@ -232,6 +232,7 @@ assert.equal(find(hpLockerLarge, "hp-paketomat").possible, false);
 
 const hpSensitive = calculatePrices(shipment({
   postalCode: "10000",
+  packages: [box(1, 20, 15, 10)],
   additionalServices: { ...noExtras, specialHandling: true },
 }));
 price(hpSensitive, "hp-paket24", 4.27);
