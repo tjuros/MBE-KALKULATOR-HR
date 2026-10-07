@@ -1658,7 +1658,7 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
   const fuel = fuelBasis * UPS_STANDARD_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
   const nonExpressCustoms = country.region === "WW" ? UPS_NON_EXPRESS_CUSTOMS_BROKERAGE : 0;
-  const usProcessing = input.destinationCountry === "United States" ? UPS_US_PROCESSING_FEE : 0;
+  const usProcessing = input.destinationCountry === "UPS:US" ? UPS_US_PROCESSING_FEE : 0;
   const details = [
     `zona ${country.standardZone}; ${tariffLabel}`,
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
@@ -1716,7 +1716,7 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
   const fuelBasis = transport + largeFee + handlingFee + residentialFee;
   const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
-  const usProcessing = input.destinationCountry === "United States" ? UPS_US_PROCESSING_FEE : 0;
+  const usProcessing = input.destinationCountry === "UPS:US" ? UPS_US_PROCESSING_FEE : 0;
   const details = [
     specialBalkans ? "posebni Express Saver cjenik za BiH / Sjevernu Makedoniju / Albaniju" : `zona ${country.saverZone}`,
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
