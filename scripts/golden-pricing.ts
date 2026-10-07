@@ -351,6 +351,7 @@ price(austria, "dpd-export", 5.54);
 price(austria, "gls-export", 7.03);
 assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
+assert.match(find(austria, "hp-ems").details.join(" "), /osigurana vrijednost do 165,00 € uključena/);
 price(austria, "ups-standard", 15.1);
 price(austria, "ups-express-saver", 26.63);
 assert.match(find(austria, "ups-standard").details.join(" "), /gorivo 34,00% \(od 05\.10\.2026\.\)/);
@@ -365,13 +366,28 @@ assert.deepEqual(exportCodCarriers("Austria"), []);
 assert.deepEqual(exportCodCarriers("Slovenia"), ["GLS", "DPD"]);
 assert.deepEqual(exportCodCarriers("Poland"), ["DPD"]);
 
+const austriaHpDeclared = calculatePrices(shipment({
+  destinationCountry: "Austria",
+  goodsValue: 500,
+  packages: [box(2, 30, 20, 10)],
+}));
+price(austriaHpDeclared, "hp-ems", 34.4);
+assert.match(find(austriaHpDeclared, "hp-ems").details.join(" "), /dodatak na označenu vrijednost 500\.00 € = 10\.40 €/);
+
+const hpEmsTooSmall = calculatePrices(shipment({
+  destinationCountry: "Austria",
+  packages: [box(1, 20, 10, 5)],
+}));
+assert.equal(find(hpEmsTooSmall, "hp-ems").possible, false);
+assert.match(find(hpEmsTooSmall, "hp-ems").details.join(" "), /17,6 × 25,0 cm/);
+
 const greatBritain = calculatePrices(shipment({
   destinationCountry: "Great Britain",
   postalCode: "",
   goodsValue: 100,
   packages: [box(2, 30, 20, 10)],
 }));
-price(greatBritain, "hp-ems", 33.97);
+price(greatBritain, "hp-ems", 32);
 price(greatBritain, "gls-export", 42.11);
 price(greatBritain, "dpd-export", 44.25);
 price(greatBritain, "ups-standard", 63.5);
