@@ -539,18 +539,18 @@ export default function App() {
                 </div>
               ) : null}
 
-              <div>
-                <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Primatelj</label>
-                <select value={recipientType} onChange={(event) => setRecipientType(event.target.value as RecipientType)} style={inputStyle()}>
-                  <option value="private">Fizička osoba</option>
-                  <option value="business">Pravna osoba / poslovni primatelj</option>
-                </select>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>
-                  {isDomestic
-                    ? "Schenker ugovorene paketne i paletne cijene vrijede samo za poslovne primatelje."
-                    : "UPS za dostavu na privatnu adresu obračunava Residential Delivery nadoplatu."}
+              {isDomestic ? (
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Vrsta primatelja <span style={{ color: "#64748b", fontWeight: 700 }}>(Lagermax / Schenker)</span></label>
+                  <select value={recipientType} onChange={(event) => setRecipientType(event.target.value as RecipientType)} style={inputStyle()}>
+                    <option value="private">Fizička osoba</option>
+                    <option value="business">Pravna osoba / poslovni primatelj</option>
+                  </select>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>
+                    Ovaj podatak koristi se samo za Lagermax i Schenker; ne utječe na ostale kurire.
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div>
                 <div style={{ fontWeight: 900, marginBottom: 7, fontSize: isMobile ? 16 : 18 }}>Paket 1</div>
@@ -735,7 +735,7 @@ export default function App() {
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
               <div>Polazište: <strong>{originPostalCode || "—"}</strong></div>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
-              <div>Primatelj: <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div>
+              {isDomestic ? <div>Primatelj (Lagermax / Schenker): <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div> : null}
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
               {!isDomestic ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "nije unesena"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
