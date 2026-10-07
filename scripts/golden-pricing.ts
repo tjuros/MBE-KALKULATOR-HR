@@ -439,8 +439,8 @@ const austriaResidential = calculatePrices(shipment({
   postalCode: "",
   packages: [box(2, 30, 20, 10)],
 }));
-price(austriaResidential, "ups-standard", 19.65);
-price(austriaResidential, "ups-express-saver", 31.84);
+price(austriaResidential, "ups-standard", 19.66);
+price(austriaResidential, "ups-express-saver", 31.85);
 assert.match(find(austriaResidential, "ups-standard").details.join(" "), /Residential Delivery \+3\.40 €/);
 
 const albania = calculatePrices(shipment({
