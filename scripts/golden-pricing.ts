@@ -20,6 +20,7 @@ const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
   destinationCountry: "Croatia",
   postalCode: "10000",
   destinationPlace: "",
+  recipientType: "private",
   packages: [box(1, 10, 10, 10)],
   cod: false,
   codAmount: 0,
@@ -41,6 +42,38 @@ const price = (results: PricingResults, id: string, expected: number) => {
   assert.equal(result.possible, true, `${id} should be possible: ${result.warning ?? ""}`);
   assert.equal(result.price, expected, `${id} price`);
 };
+
+const schenkerPrivate = calculatePrices(shipment({
+  postalCode: "10000",
+  recipientType: "private",
+}));
+assert.equal(find(schenkerPrivate, "schenker-packages").possible, false);
+
+const schenkerBusinessPackages = calculatePrices(shipment({
+  postalCode: "10000",
+  recipientType: "business",
+  packages: [box(5, 40, 30, 20), box(5, 40, 30, 20), box(5, 40, 30, 20)],
+}));
+price(schenkerBusinessPackages, "schenker-packages", 17.79);
+assert.match(find(schenkerBusinessPackages, "schenker-packages").details.join(" "), /minimum po pošiljci 12\.00 €/);
+assert.match(find(schenkerBusinessPackages, "schenker-packages").details.join(" "), /gorivo 9%/);
+
+const schenkerKorcula = calculatePrices(shipment({
+  postalCode: "20260",
+  recipientType: "business",
+  packages: [box(5, 40, 30, 20)],
+}));
+price(schenkerKorcula, "schenker-packages", 22.26);
+assert.match(find(schenkerKorcula, "schenker-packages").details.join(" "), /Korčula/);
+
+const schenkerPallet = calculatePrices(shipment({
+  originPostalCode: "48260",
+  postalCode: "10000",
+  recipientType: "business",
+  packages: [box(100, 100, 70, 60)],
+}));
+price(schenkerPallet, "schenker-pallet", 37.5);
+assert.match(find(schenkerPallet, "schenker-pallet").details.join(" "), /34\.40 €/);
 
 const virovitica = calculatePrices(shipment({
   postalCode: "33000",

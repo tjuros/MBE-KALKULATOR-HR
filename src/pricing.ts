@@ -46,6 +46,7 @@ export type AdditionalServices = {
 };
 
 export type CodPaymentMethod = "cash" | "card";
+export type RecipientType = "private" | "business";
 
 export type InTimeOptions = {
   smsNotification: boolean;
@@ -64,6 +65,7 @@ export type PricingInput = {
   destinationCountry: string;
   postalCode: string;
   destinationPlace: string;
+  recipientType: RecipientType;
   packages: NumericPackageItem[];
   cod: boolean;
   codAmount: number;
@@ -203,6 +205,93 @@ const HP_LOCKER_COMPARTMENTS: Array<[number, number, number]> = [
   [39, 38, 64],
 ];
 
+
+const SCHENKER_PACKAGE_PRICE = 5.44;
+const SCHENKER_KORCULA_PACKAGE_PRICE = 14.00;
+const SCHENKER_PACKAGE_MINIMUM = 12.00;
+const SCHENKER_PACKAGE_MAX_WEIGHT = 25;
+const SCHENKER_PACKAGE_LIMITS: [number, number, number] = [60, 50, 40];
+const SCHENKER_PALLET_LIMITS: [number, number, number] = [120, 80, 190];
+const SCHENKER_PALLET_MAX_WEIGHT = 600;
+const SCHENKER_FUEL_REFERENCE = 1.79; // latest verified September 2026 Petrol Eurodizel AD reference
+const SCHENKER_FUEL_SURCHARGE = 0.09; // contract matrix: 1.79-1.82 EUR/l => 9%
+const SCHENKER_ISLAND_SURCHARGE = 0.50;
+const SCHENKER_KORCULA_POSTALS = new Set(["20260","20263","20264","20270","20271","20272","20273","20274","20275"]);
+
+type SchenkerBand =
+  | "10000"
+  | "40000"
+  | "51000"
+  | "31000"
+  | "52000"
+  | "23000"
+  | "53000"
+  | "21000"
+  | "20000";
+
+const schenkerBand = (postalCode: string): SchenkerBand | null => {
+  const value = Number(postalCode);
+  if (!Number.isFinite(value)) return null;
+  if (value >= 10000 && value <= 10999) return "10000";
+  if (value >= 40000 && value <= 49999) return "40000";
+  if (value >= 51000 && value <= 51999) return "51000";
+  if (value >= 31000 && value <= 35999) return "31000";
+  if (value >= 52000 && value <= 52999) return "52000";
+  if (value >= 23000 && value <= 23999) return "23000";
+  if (value >= 53000 && value <= 53999) return "53000";
+  if (value >= 21000 && value <= 22999) return "21000";
+  if (value >= 20000 && value <= 20999) return "20000";
+  return null;
+};
+
+const SCHENKER_PALLET_RATES: Partial<Record<SchenkerBand, Partial<Record<SchenkerBand, number>>>> = {
+  "10000": {
+    "10000": 22.99, "40000": 33.40, "51000": 35.43, "31000": 36.33,
+    "52000": 44.32, "23000": 44.32, "53000": 44.32, "21000": 47.60, "20000": 67.47,
+  },
+  "40000": {
+    "40000": 23.68, "10000": 34.40, "51000": 37.55, "31000": 38.51,
+    "52000": 46.97, "23000": 46.97, "53000": 46.97, "21000": 50.45, "20000": 71.52,
+  },
+  "51000": {
+    "51000": 24.37, "10000": 35.40, "52000": 35.40, "40000": 37.55,
+    "53000": 38.51, "31000": 46.97, "21000": 50.45, "23000": 50.45, "20000": 71.52,
+  },
+  "52000": {
+    "51000": 24.37, "10000": 35.40, "52000": 35.40, "40000": 37.55,
+    "53000": 38.51, "31000": 46.97, "21000": 50.45, "23000": 50.45, "20000": 71.52,
+  },
+  "31000": {
+    "31000": 24.37, "10000": 35.40, "40000": 37.55, "51000": 38.51,
+    "52000": 46.97, "23000": 46.97, "53000": 46.97, "21000": 50.45, "20000": 71.52,
+  },
+  "23000": {
+    "23000": 24.37, "10000": 35.40, "40000": 37.55, "21000": 38.51,
+    "51000": 46.97, "52000": 50.45, "53000": 50.45, "31000": 50.45, "20000": 71.52,
+  },
+  "53000": {
+    "23000": 24.37, "10000": 35.40, "40000": 37.55, "21000": 38.51,
+    "51000": 46.97, "52000": 50.45, "53000": 50.45, "31000": 50.45, "20000": 71.52,
+  },
+  "21000": {
+    "21000": 24.37, "20000": 35.40, "10000": 37.55, "40000": 38.51,
+    "51000": 46.97, "52000": 50.45, "23000": 50.45, "53000": 50.45, "31000": 71.52,
+  },
+  "20000": {
+    "21000": 24.37, "20000": 35.40, "10000": 37.55, "40000": 38.51,
+    "51000": 46.97, "52000": 50.45, "23000": 50.45, "53000": 50.45, "31000": 71.52,
+  },
+};
+
+const schenkerIslandSchedule = (postalCode: string) => {
+  if (SCHENKER_KORCULA_POSTALS.has(postalCode)) return "Korčula: subota ili ponedjeljak";
+  if (["21450","21454","21460","21462","21463","21465","21466","21467","21468","21469"].includes(postalCode)) return "Hvar: srijeda, petak ili subota";
+  if (["21400","21403","21404","21405","21410","21412","21413"].includes(postalCode)) return "Brač: srijeda";
+  if (["51280","51281"].includes(postalCode)) return "Rab: petak ili subota";
+  if (["51550","51551","51552","51554","51555","51557","51561","51562"].includes(postalCode)) return "Cres/Lošinj: subota";
+  if (["51500","51511","51512","51513","51514","51515","51516","51517"].includes(postalCode)) return "Krk: ponedjeljak, srijeda ili petak";
+  return null;
+};
 
 const OVERSEAS_SINGLE: Tier[] = [
   { max: 10, price: 2.61 }, { max: 20, price: 3.24 }, { max: 31.5, price: 3.52 },
@@ -714,6 +803,105 @@ export const calcDPDShop = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: "ok",
+  };
+};
+
+export const calcSchenkerPackages = (input: PricingInput): PriceResult => {
+  const id = "schenker-packages";
+  const serviceType: ServiceType = "MBE Economy";
+  if (input.recipientType !== "business") {
+    return unavailable(id, "Schenker Paketi", "Schenker", serviceType, "Schenker ugovorene paketne cijene ne podržavaju dostavu fizičkim osobama.");
+  }
+  if (input.cod) return unavailable(id, "Schenker Paketi", "Schenker", serviceType, "COD nije naveden u Schenker ponudi; potrebna je ručna potvrda.", "manual");
+  if (input.additionalServices.addresseeOnly || input.additionalServices.specialHandling) {
+    return unavailable(id, "Schenker Paketi", "Schenker", serviceType, "Odabrana dodatna usluga nema ugovorenu Schenker paketnu cijenu.", "manual");
+  }
+  for (const item of input.packages) {
+    if (item.weight > SCHENKER_PACKAGE_MAX_WEIGHT || !fitsDimensions(item, SCHENKER_PACKAGE_LIMITS)) {
+      return unavailable(id, "Schenker Paketi", "Schenker", serviceType, "Schenker paket: max 25 kg i 60 × 50 × 40 cm; ostale dimenzije su prema upitu.", "manual");
+    }
+  }
+
+  const korcula = SCHENKER_KORCULA_POSTALS.has(input.postalCode);
+  const unit = korcula ? SCHENKER_KORCULA_PACKAGE_PRICE : SCHENKER_PACKAGE_PRICE;
+  const base = Math.max(SCHENKER_PACKAGE_MINIMUM, unit * input.packages.length);
+  const island = isAnyIsland(input.postalCode) ? base * SCHENKER_ISLAND_SURCHARGE : 0;
+  const fuel = base * SCHENKER_FUEL_SURCHARGE;
+  const documentReturn = input.additionalServices.documentReturn ? 1.70 : 0;
+  const schedule = schenkerIslandSchedule(input.postalCode);
+
+  const details = [
+    `${input.packages.length} paket(a) × ${unit.toFixed(2)} €; minimum po pošiljci ${SCHENKER_PACKAGE_MINIMUM.toFixed(2)} € = ${base.toFixed(2)} €`,
+    `gorivo ${(SCHENKER_FUEL_SURCHARGE * 100).toFixed(0)}% (ugovorna matrica; referenca ${SCHENKER_FUEL_REFERENCE.toFixed(2)} €/l) = ${fuel.toFixed(2)} €`,
+  ];
+  if (island) details.push(`otok +50% standardne cijene = ${island.toFixed(2)} €`);
+  if (documentReturn) details.push(`povrat ovjerenog dokumenta +${documentReturn.toFixed(2)} €`);
+  if (schedule) details.push(schedule);
+  details.push("čekanje na istovar uključeno do 10 min; dulje čekanje se dodatno naplaćuje");
+
+  return {
+    id,
+    name: "Schenker Paketi",
+    carrier: "Schenker",
+    price: round2(base + fuel + island + documentReturn),
+    possible: true,
+    details,
+    serviceType,
+    status: fuel || island || documentReturn ? "surcharge" : "ok",
+    warning: schedule && /Hvar|Brač|Cres|Lošinj/.test(schedule)
+      ? "Za Hvar, Brač, Cres i Lošinj pošiljka mora biti dan ranije u regionalnom distribucijskom centru."
+      : undefined,
+  };
+};
+
+export const calcSchenkerPallet = (input: PricingInput): PriceResult => {
+  const id = "schenker-pallet";
+  const serviceType: ServiceType = "MBE Economy";
+  if (input.recipientType !== "business") {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Schenker ugovorene paletne cijene ne podržavaju dostavu fizičkim osobama.");
+  }
+  if (input.cod || Object.values(input.additionalServices).some(Boolean)) {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "COD i odabrane dodatne usluge nisu uključeni u automatski Schenker paletni izračun.", "manual");
+  }
+  if (!input.originPostalCode || input.originPostalCode.length !== 5) {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Za Schenker paletu potreban je poštanski broj polazišta.", "manual");
+  }
+  if (!input.packages.every((item) => fitsDimensions(item, SCHENKER_PALLET_LIMITS))) {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Paleta mora biti unutar 120 × 80 × 190 cm; ostale dimenzije su prema upitu.", "manual");
+  }
+  const estimatedWeight = totalWeight(input.packages) + 25;
+  if (estimatedWeight > SCHENKER_PALLET_MAX_WEIGHT || totalVolume(input.packages) > 120 * 80 * 190) {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Jedna europaleta je ugovorena do 600 kg i 120 × 80 × 190 cm; veća pošiljka je prema upitu.", "manual");
+  }
+  const originBand = schenkerBand(input.originPostalCode);
+  const destinationBand = schenkerBand(input.postalCode);
+  if (!originBand || !destinationBand) {
+    return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Polazišni ili odredišni poštanski broj nije obuhvaćen dostavljenom Schenker paletnom matricom.", "manual");
+  }
+  const base = SCHENKER_PALLET_RATES[originBand]?.[destinationBand] ?? null;
+  if (base === null) return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Za ovu relaciju nema jednoznačne ugovorene Schenker paletne cijene.", "manual");
+  const island = isAnyIsland(input.postalCode) ? base * SCHENKER_ISLAND_SURCHARGE : 0;
+  const fuel = base * SCHENKER_FUEL_SURCHARGE;
+  const schedule = schenkerIslandSchedule(input.postalCode);
+  const details = [
+    `paleta do 600 kg; relacija ${input.originPostalCode} → ${input.postalCode}: ${base.toFixed(2)} €`,
+    `procijenjena masa s europaletom: ${estimatedWeight.toFixed(2)} kg`,
+    `gorivo ${(SCHENKER_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+    "čekanje na utovar/istovar uključeno do 20 min",
+  ];
+  if (island) details.push(`otok +50% standardne cijene = ${island.toFixed(2)} €`);
+  if (schedule) details.push(schedule);
+
+  return {
+    id,
+    name: "Schenker Paleta",
+    carrier: "Schenker",
+    price: round2(base + fuel + island),
+    possible: true,
+    details,
+    serviceType,
+    status: "surcharge",
+    warning: "Ponuda je za komercijalnu neopasnu robu i pravne osobe; ostale dimenzije/palete su prema upitu.",
   };
 };
 
@@ -1573,6 +1761,8 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     ...(input.packages.length === 1 ? [calcOverseasSingle(input)] : [calcOverseasMulti(input)]),
     calcInTime(input),
     calcLagermax(input),
+    calcSchenkerPackages(input),
+    calcSchenkerPallet(input),
     calcHPPallet(input),
   ]);
   const express = sortResults([calcGLS(input)]);
