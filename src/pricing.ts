@@ -11,12 +11,17 @@ import {
   UPS_BALKANS_SAVER_OVER_70,
   UPS_BALKANS_SAVER_RATES,
   UPS_EXPRESS_SAVER_FUEL,
+  UPS_FUEL_EFFECTIVE_FROM,
   UPS_EXPORT_CLEARANCE,
   UPS_LARGE_PACKAGE,
   UPS_NON_EXPRESS_CUSTOMS_BROKERAGE,
   UPS_OVER_MAXIMUM,
   UPS_REMOTE_MINIMUM,
   UPS_REMOTE_RATE_PER_KG,
+  UPS_TRUE_REMOTE_MINIMUM,
+  UPS_TRUE_REMOTE_RATE_PER_KG,
+  UPS_RESIDENTIAL_DELIVERY,
+  UPS_US_PROCESSING_FEE,
   UPS_SAVER_OVER_70,
   UPS_SAVER_PACKAGE_RATES,
   UPS_STANDARD_FUEL,
@@ -1603,7 +1608,7 @@ const upsUnavailableForSelections = (
 const upsWarnings = (country: UpsCountry, standard: boolean) => {
   const warnings: string[] = [];
   if (country.remotePossible) {
-    warnings.push(`Za pojedine poštanske brojeve moguća je proširena/udaljena lokacija: ${UPS_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, najmanje ${UPS_REMOTE_MINIMUM.toFixed(2)} € po pošiljci. Nije uključeno bez poštanskog broja odredišta.`);
+    warnings.push(`Za pojedine poštanske brojeve moguća je nadoplata: proširena lokacija ${UPS_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_REMOTE_MINIMUM.toFixed(2)} €; udaljena lokacija ${UPS_TRUE_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_TRUE_REMOTE_MINIMUM.toFixed(2)} €. Nije uključeno bez stranog poštanskog broja.`);
   }
   if (country.region === "WW") {
     warnings.push(standard
@@ -1648,10 +1653,12 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
 
   const largeFee = largeCount * UPS_LARGE_PACKAGE;
   const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
-  const fuelBasis = transport + largeFee + handlingFee;
+  const residentialFee = input.recipientType === "private" ? UPS_RESIDENTIAL_DELIVERY : 0;
+  const fuelBasis = transport + largeFee + handlingFee + residentialFee;
   const fuel = fuelBasis * UPS_STANDARD_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
   const nonExpressCustoms = country.region === "WW" ? UPS_NON_EXPRESS_CUSTOMS_BROKERAGE : 0;
+  const usProcessing = input.destinationCountry === "UPS:US" ? UPS_US_PROCESSING_FEE : 0;
   const details = [
     `zona ${country.standardZone}; ${tariffLabel}`,
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
@@ -1659,15 +1666,17 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
   ];
   if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
   if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
-  details.push(`gorivo 31,25% = ${fuel.toFixed(2)} €`);
+  if (residentialFee) details.push(`Residential Delivery +${residentialFee.toFixed(2)} €`);
+  details.push(`gorivo ${(UPS_STANDARD_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);
   if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
   if (nonExpressCustoms) details.push(`carinsko posredovanje za non-Express +${nonExpressCustoms.toFixed(2)} €`);
+  if (usProcessing) details.push(`US International Processing Fee +${usProcessing.toFixed(2)} €`);
 
   return {
     id,
     name,
     carrier: "UPS",
-    price: round2(fuelBasis + fuel + exportClearance + nonExpressCustoms),
+    price: round2(fuelBasis + fuel + exportClearance + nonExpressCustoms + usProcessing),
     possible: true,
     details,
     serviceType,
@@ -1703,9 +1712,11 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
 
   const largeFee = largeCount * UPS_LARGE_PACKAGE;
   const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
-  const fuelBasis = transport + largeFee + handlingFee;
+  const residentialFee = input.recipientType === "private" ? UPS_RESIDENTIAL_DELIVERY : 0;
+  const fuelBasis = transport + largeFee + handlingFee + residentialFee;
   const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
+  const usProcessing = input.destinationCountry === "UPS:US" ? UPS_US_PROCESSING_FEE : 0;
   const details = [
     specialBalkans ? "posebni Express Saver cjenik za BiH / Sjevernu Makedoniju / Albaniju" : `zona ${country.saverZone}`,
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
@@ -1713,14 +1724,16 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
   ];
   if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
   if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
-  details.push(`gorivo 48,25% = ${fuel.toFixed(2)} €`);
+  if (residentialFee) details.push(`Residential Delivery +${residentialFee.toFixed(2)} €`);
+  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);
   if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
+  if (usProcessing) details.push(`US International Processing Fee +${usProcessing.toFixed(2)} €`);
 
   return {
     id,
     name,
     carrier: "UPS",
-    price: round2(fuelBasis + fuel + exportClearance),
+    price: round2(fuelBasis + fuel + exportClearance + usProcessing),
     possible: true,
     details,
     serviceType,

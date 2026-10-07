@@ -17,16 +17,21 @@ export type UpsCountry = {
   specialSaver: "BALKANS" | null;
 };
 
-// UPS Croatia fuel surcharge, effective 10 August 2026.
-export const UPS_EXPRESS_SAVER_FUEL = 0.4825;
-export const UPS_STANDARD_FUEL = 0.3125;
+// UPS Croatia fuel surcharge, effective 5 October 2026.
+export const UPS_FUEL_EFFECTIVE_FROM = "05.10.2026.";
+export const UPS_EXPRESS_SAVER_FUEL = 0.5325;
+export const UPS_STANDARD_FUEL = 0.34;
 export const UPS_ADDITIONAL_HANDLING = 13.2;
 export const UPS_LARGE_PACKAGE = 54.75;
 export const UPS_OVER_MAXIMUM = 346.95;
 export const UPS_EXPORT_CLEARANCE = 6;
-export const UPS_NON_EXPRESS_CUSTOMS_BROKERAGE = 55;
-export const UPS_REMOTE_RATE_PER_KG = 0.62;
-export const UPS_REMOTE_MINIMUM = 31.5;
+export const UPS_NON_EXPRESS_CUSTOMS_BROKERAGE = 40;
+export const UPS_REMOTE_RATE_PER_KG = 0.62; // Extended Area
+export const UPS_REMOTE_MINIMUM = 31.5; // Extended Area
+export const UPS_TRUE_REMOTE_RATE_PER_KG = 0.66;
+export const UPS_TRUE_REMOTE_MINIMUM = 32.5;
+export const UPS_RESIDENTIAL_DELIVERY = 3.40;
+export const UPS_US_PROCESSING_FEE = 2.35;
 
 export const UPS_SAVER_PACKAGE_RATES = {
   "703": [
