@@ -463,15 +463,15 @@ assert.match(find(usa, "ups-express-saver").details.join(" "), /US International
 assert.equal(usa.recommendedWinner, null, "USA has no Economy tariff in the supplied UPS guide");
 assert.equal(usa.expressWinner?.id, "ups-express-saver");
 
-const austriaResidential = calculatePrices(shipment({
+const austriaPrivateRecipient = calculatePrices(shipment({
   destinationCountry: "Austria",
   recipientType: "private",
   postalCode: "",
   packages: [box(2, 30, 20, 10)],
 }));
-price(austriaResidential, "ups-standard", 19.66);
-price(austriaResidential, "ups-express-saver", 31.85);
-assert.match(find(austriaResidential, "ups-standard").details.join(" "), /Residential Delivery \+3\.40 €/);
+price(austriaPrivateRecipient, "ups-standard", 15.1);
+price(austriaPrivateRecipient, "ups-express-saver", 26.63);
+assert.match(find(austriaPrivateRecipient, "ups-standard").warning ?? "", /Residential Delivery nije automatski uključen/);
 
 const albania = calculatePrices(shipment({
   destinationCountry: "UPS:AL",
