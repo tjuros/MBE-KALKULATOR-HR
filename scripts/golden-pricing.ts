@@ -20,7 +20,7 @@ const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
   destinationCountry: "Croatia",
   postalCode: "10000",
   destinationPlace: "",
-  recipientType: "private",
+  recipientType: "business",
   packages: [box(1, 10, 10, 10)],
   cod: false,
   codAmount: 0,
@@ -351,8 +351,10 @@ price(austria, "dpd-export", 5.54);
 price(austria, "gls-export", 7.03);
 assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
-price(austria, "ups-standard", 14.79);
-price(austria, "ups-express-saver", 25.77);
+price(austria, "ups-standard", 15.1);
+price(austria, "ups-express-saver", 26.63);
+assert.match(find(austria, "ups-standard").details.join(" "), /gorivo 34,00% \(od 05\.10\.2026\.\)/);
+assert.match(find(austria, "ups-express-saver").details.join(" "), /gorivo 53,25% \(od 05\.10\.2026\.\)/);
 assert.equal(austria.lockers.length, 0, "Export must not offer parcel lockers");
 assert.equal(austria.express.length, 1, "UPS Express Saver must be the export Express option");
 assert.equal(find(austria, "gls-export").serviceType, "MBE Economy");
@@ -372,8 +374,9 @@ const greatBritain = calculatePrices(shipment({
 price(greatBritain, "hp-ems", 33.97);
 price(greatBritain, "gls-export", 42.11);
 price(greatBritain, "dpd-export", 44.25);
-price(greatBritain, "ups-standard", 78.14);
-price(greatBritain, "ups-express-saver", 35.44);
+price(greatBritain, "ups-standard", 63.5);
+assert.match(find(greatBritain, "ups-standard").details.join(" "), /non-Express \+40\.00 €/);
+price(greatBritain, "ups-express-saver", 36.44);
 
 const ukraine = calculatePrices(shipment({
   destinationCountry: "Ukraine",
@@ -390,32 +393,32 @@ const germanyVolumetric = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(2, 50, 40, 30)],
 }));
-price(germanyVolumetric, "ups-standard", 26.83);
-price(germanyVolumetric, "ups-express-saver", 86.39);
+price(germanyVolumetric, "ups-standard", 27.39);
+price(germanyVolumetric, "ups-express-saver", 89.3);
 assert.match(find(germanyVolumetric, "ups-standard").details.join(" "), /obračunska masa 12\.0 kg/);
 
 const germanyMulti = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(0.6, 10, 10, 10), box(0.6, 10, 10, 10)],
 }));
-price(germanyMulti, "ups-standard", 22.34);
-price(germanyMulti, "ups-express-saver", 23.22);
+price(germanyMulti, "ups-standard", 22.81);
+price(germanyMulti, "ups-express-saver", 24);
 assert.match(find(germanyMulti, "ups-standard").details.join(" "), /višepaketna pošiljka/);
 
 const germanyHandling = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(26, 50, 40, 30)],
 }));
-price(germanyHandling, "ups-standard", 53.08);
-price(germanyHandling, "ups-express-saver", 168.77);
+price(germanyHandling, "ups-standard", 54.19);
+price(germanyHandling, "ups-express-saver", 174.46);
 assert.match(find(germanyHandling, "ups-standard").details.join(" "), /dodatna manipulacija/);
 
 const germanyLarge = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(10, 101, 50, 50)],
 }));
-price(germanyLarge, "ups-standard", 175.05);
-price(germanyLarge, "ups-express-saver", 373.56);
+price(germanyLarge, "ups-standard", 178.72);
+price(germanyLarge, "ups-express-saver", 386.16);
 assert.match(find(germanyLarge, "ups-standard").details.join(" "), /veliki paket/);
 assert.doesNotMatch(find(germanyLarge, "ups-standard").details.join(" "), /dodatna manipulacija/);
 
@@ -425,9 +428,20 @@ const usa = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 assert.equal(find(usa, "ups-standard").possible, false);
-price(usa, "ups-express-saver", 52.76);
+price(usa, "ups-express-saver", 56.69);
+assert.match(find(usa, "ups-express-saver").details.join(" "), /US International Processing Fee \+2\.35 €/);
 assert.equal(usa.recommendedWinner, null, "USA has no Economy tariff in the supplied UPS guide");
 assert.equal(usa.expressWinner?.id, "ups-express-saver");
+
+const austriaResidential = calculatePrices(shipment({
+  destinationCountry: "Austria",
+  recipientType: "private",
+  postalCode: "",
+  packages: [box(2, 30, 20, 10)],
+}));
+price(austriaResidential, "ups-standard", 19.65);
+price(austriaResidential, "ups-express-saver", 31.84);
+assert.match(find(austriaResidential, "ups-standard").details.join(" "), /Residential Delivery \+3\.40 €/);
 
 const albania = calculatePrices(shipment({
   destinationCountry: "UPS:AL",
@@ -435,7 +449,7 @@ const albania = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 assert.equal(find(albania, "ups-standard").possible, false);
-price(albania, "ups-express-saver", 123.44);
+price(albania, "ups-express-saver", 127.4);
 assert.match(find(albania, "ups-express-saver").details[0], /posebni Express Saver cjenik/);
 
 const upsOverMaximum = calculatePrices(shipment({
