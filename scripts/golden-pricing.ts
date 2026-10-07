@@ -110,6 +110,9 @@ const zagrebBulk = calculatePrices(shipment({
 }));
 price(zagrebBulk, "box-now", 25.2);
 price(zagrebBulk, "hp-paleta", 30.56);
+assert.match(find(zagrebBulk, "hp-paleta").name, /Žurna paleta/);
+assert.match(find(zagrebBulk, "hp-paleta").details.join(" "), /rok do D\+4/);
+assert.match(find(zagrebBulk, "hp-paket24").details.join(" "), /do 31\.10\.2026/);
 price(zagrebBulk, "hp-paket24", 41.8);
 price(zagrebBulk, "overseas-multi", 44.22);
 price(zagrebBulk, "dpd-standard", 61.02);
@@ -138,6 +141,34 @@ const dpdOversize = calculatePrices(shipment({
 }));
 assert.equal(find(dpdOversize, "dpd-standard").status, "manual");
 assert.match(find(dpdOversize, "dpd-standard").details.join(" "), /oversize.*25,00 €/);
+
+
+const hpMinSize = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(1, 10, 8, 2)],
+}));
+assert.equal(find(hpMinSize, "hp-paket24").possible, false);
+assert.match(find(hpMinSize, "hp-paket24").details.join(" "), /9 × 14 cm/);
+
+const hpOversizeLight = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(10, 70, 40, 30)],
+}));
+assert.equal(find(hpOversizeLight, "hp-paket24").possible, false);
+price(hpOversizeLight, "hp-paleta", 30.56);
+
+const hpPallet180 = calculatePrices(shipment({
+  postalCode: "10000",
+  packages: [box(35, 80, 70, 180)],
+}));
+price(hpPallet180, "hp-paleta", 30.56);
+
+const hpExpiredTariff = calculatePrices(shipment({
+  pricingDate: "2026-11-01",
+  postalCode: "10000",
+}));
+assert.equal(find(hpExpiredTariff, "hp-paket24").status, "manual");
+assert.match(find(hpExpiredTariff, "hp-paket24").details.join(" "), /novi cjenik/);
 
 const overseasOversize = calculatePrices(shipment({
   postalCode: "10000",
