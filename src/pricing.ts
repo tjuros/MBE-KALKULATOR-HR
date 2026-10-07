@@ -6,6 +6,7 @@ import {
   PLACE_OPTIONS_BY_POSTAL,
 } from "./destinationRules";
 import { EXPORT_TARIFFS, type ExportCountryTariff, type ExportTier } from "./exportTariffs";
+import { DPD_ROAD_FUEL_PER_PACKAGE, FUEL_CONFIG } from "./fuelConfig";
 import {
   UPS_ADDITIONAL_HANDLING,
   UPS_BALKANS_SAVER_OVER_70,
@@ -107,7 +108,6 @@ type Tier = { max: number; price: number };
 type Zone = 1 | 2 | 3;
 
 const OVERSEAS_VOLUME_DISCOUNT = 0.06; // Effective from 2026-10-01.
-const OVERSEAS_FUEL_SURCHARGE = 0.08; // MBE matrix at latest published diesel reference 1.86 EUR/l.
 const OVERSEAS_OVSZ_FEE = 1.5; // Effective from 2026-10-01; acceptance of out-of-standard parcels still requires confirmation.
 
 const GLS_SINGLE: Tier[] = [
@@ -146,10 +146,6 @@ const GLS_LOCKER_MULTI_5_PLUS: Tier[] = [
   { max: 25, price: 4.75 }, { max: 30, price: 5.98 }, { max: 40, price: 7.19 },
 ];
 
-const GLS_FUEL_INDEX = 1.652; // Latest GLS Croatia published index: September 2026.
-const GLS_FUEL_CATEGORY_COUNT = Math.ceil((GLS_FUEL_INDEX - 1) / 0.03);
-const GLS_DOMESTIC_FUEL_PER_PACKAGE = GLS_FUEL_CATEGORY_COUNT * 0.02;
-const GLS_EXPORT_FUEL = GLS_FUEL_CATEGORY_COUNT * 0.006;
 const GLS_DOMESTIC_SMS = 0.12;
 const GLS_DOMESTIC_COD = 0.49;
 const GLS_BANK_CARD_RATE = 0.01;
@@ -164,23 +160,6 @@ const DPD_SHOP: Tier[] = [
   { max: 15, price: 2.25 }, { max: 20, price: 2.70 },
 ];
 
-const DPD_DIESEL_REFERENCE_MONTH = "09/2026";
-const DPD_DIESEL_REFERENCE = 1.96; // Average of September 2026 EC Weekly Oil Bulletin observations for Croatia.
-
-const dpdRoadFuelPerPackage = (dieselPrice: number) => {
-  if (dieselPrice <= 1.60) return 0;
-  if (dieselPrice <= 1.70) return 0.10;
-  if (dieselPrice <= 1.80) return 0.20;
-  if (dieselPrice <= 1.90) return 0.40;
-  if (dieselPrice <= 2.00) return 0.50;
-  if (dieselPrice <= 2.20) return 0.55;
-  if (dieselPrice <= 2.30) return 0.60;
-  if (dieselPrice <= 2.40) return 0.65;
-  if (dieselPrice <= 2.50) return 0.70;
-  return 0.70 + Math.ceil((dieselPrice - 2.50) / 0.10) * 0.05;
-};
-
-const DPD_ROAD_FUEL_PER_PACKAGE = dpdRoadFuelPerPackage(DPD_DIESEL_REFERENCE);
 const DPD_ISLAND_SURCHARGE = 3.50;
 
 const HP_PARCEL: Tier[] = [
@@ -218,8 +197,6 @@ const SCHENKER_PACKAGE_MAX_WEIGHT = 25;
 const SCHENKER_PACKAGE_LIMITS: [number, number, number] = [60, 50, 40];
 const SCHENKER_PALLET_LIMITS: [number, number, number] = [120, 80, 190];
 const SCHENKER_PALLET_MAX_WEIGHT = 600;
-const SCHENKER_FUEL_REFERENCE = 1.79; // latest verified September 2026 Petrol Eurodizel AD reference
-const SCHENKER_FUEL_SURCHARGE = 0.09; // contract matrix: 1.79-1.82 EUR/l => 9%
 const SCHENKER_ISLAND_SURCHARGE = 0.50;
 const SCHENKER_KORCULA_POSTALS = new Set(["20260","20263","20264","20270","20271","20272","20273","20274","20275"]);
 
@@ -345,7 +322,6 @@ const INTIME: Record<Zone, Tier[]> = {
   ],
 };
 
-const INTIME_FUEL_SURCHARGE = 0.15; // MBE/InTime contracted price list.
 const INTIME_SEASONAL_SURCHARGE = 0.15;
 const INTIME_DECLARED_VALUE_RATE = 0.006;
 const INTIME_DECLARED_VALUE_THRESHOLD = 130;
@@ -460,7 +436,6 @@ const LAGERMAX_ISLAND_SCHEDULES: Array<{ postals: Set<string>; label: string; sc
   },
 ];
 
-const LAGERMAX_FUEL_SURCHARGE = 0.066; // Contracted working factor; last reviewed 2026-10-06.
 const LAGERMAX_ISLAND_SURCHARGE = 0.50;
 
 const lagermaxIslandSchedule = (postalCode: string) =>
@@ -639,12 +614,12 @@ export const calcGLS = (input: PricingInput): PriceResult => {
     base += itemPrice;
   }
 
-  const fuel = GLS_DOMESTIC_FUEL_PER_PACKAGE * packages.length;
+  const fuel = FUEL_CONFIG.gls.domesticPerPackage * packages.length;
   const sms = GLS_DOMESTIC_SMS;
   const codFee = input.cod ? GLS_DOMESTIC_COD : 0;
   const details = [
     `${packages.length === 1 ? "single" : packages.length <= 4 ? "multi 2–4" : "multi 5+"}: ${base.toFixed(2)} €`,
-    `gorivo ${packages.length} × ${GLS_DOMESTIC_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `gorivo ${packages.length} × ${FUEL_CONFIG.gls.domesticPerPackage.toFixed(2)} € = ${fuel.toFixed(2)} €`,
     `SMS po pošiljci = ${sms.toFixed(2)} €`,
   ];
   if (special) details.push("GLS posebno dostavno područje");
@@ -697,13 +672,13 @@ export const calcGLSLocker = (input: PricingInput): PriceResult => {
     base += itemPrice;
   }
 
-  const fuel = GLS_DOMESTIC_FUEL_PER_PACKAGE * input.packages.length;
+  const fuel = FUEL_CONFIG.gls.domesticPerPackage * input.packages.length;
   const sms = GLS_DOMESTIC_SMS;
   const codFee = input.cod ? GLS_DOMESTIC_COD : 0;
   const bankCardFee = input.cod ? input.codAmount * GLS_BANK_CARD_RATE : 0;
   const details = [
     `${input.packages.length === 1 ? "single" : input.packages.length <= 4 ? "multi 2–4" : "multi 5+"} Paketomat: ${base.toFixed(2)} €`,
-    `gorivo ${input.packages.length} × ${GLS_DOMESTIC_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `gorivo ${input.packages.length} × ${FUEL_CONFIG.gls.domesticPerPackage.toFixed(2)} € = ${fuel.toFixed(2)} €`,
     `SMS po pošiljci = ${sms.toFixed(2)} €`,
   ];
   if (input.cod) {
@@ -746,7 +721,7 @@ export const calcDPD = (input: PricingInput): PriceResult => {
   const island = isIsland(postalCode) ? DPD_ISLAND_SURCHARGE * packages.length : 0;
   const details = [
     packages.length >= 2 ? `DPD Multi ${packages.length} × 2,89 € = ${base.toFixed(2)} €` : `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `gorivo ${FUEL_CONFIG.dpd.referenceMonth} (${FUEL_CONFIG.dpd.dieselReference.toFixed(2)} €/l): ${packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
   ];
   if (island) details.push(`otočna nadoplata ${packages.length} × ${DPD_ISLAND_SURCHARGE.toFixed(2)} € = ${island.toFixed(2)} €`);
   if (input.cod) details.push("gotovinski COD uključen");
@@ -796,7 +771,7 @@ export const calcDPDShop = (input: PricingInput): PriceResult => {
   const fuel = DPD_ROAD_FUEL_PER_PACKAGE * input.packages.length;
   const details = [
     `DPD Shop ${input.packages.length} paket(a): ${base.toFixed(2)} €`,
-    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `gorivo ${FUEL_CONFIG.dpd.referenceMonth} (${FUEL_CONFIG.dpd.dieselReference.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
   ];
 
   return {
@@ -831,13 +806,13 @@ export const calcSchenkerPackages = (input: PricingInput): PriceResult => {
   const unit = korcula ? SCHENKER_KORCULA_PACKAGE_PRICE : SCHENKER_PACKAGE_PRICE;
   const base = Math.max(SCHENKER_PACKAGE_MINIMUM, unit * input.packages.length);
   const island = isAnyIsland(input.postalCode) ? base * SCHENKER_ISLAND_SURCHARGE : 0;
-  const fuel = base * SCHENKER_FUEL_SURCHARGE;
+  const fuel = base * FUEL_CONFIG.schenker.rate;
   const documentReturn = input.additionalServices.documentReturn ? 1.70 : 0;
   const schedule = schenkerIslandSchedule(input.postalCode);
 
   const details = [
     `${input.packages.length} paket(a) × ${unit.toFixed(2)} €; minimum po pošiljci ${SCHENKER_PACKAGE_MINIMUM.toFixed(2)} € = ${base.toFixed(2)} €`,
-    `gorivo ${(SCHENKER_FUEL_SURCHARGE * 100).toFixed(0)}% (ugovorna matrica; referenca ${SCHENKER_FUEL_REFERENCE.toFixed(2)} €/l) = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.schenker.rate * 100).toFixed(0)}% (ugovorna matrica; referenca ${FUEL_CONFIG.schenker.dieselReference.toFixed(2)} €/l) = ${fuel.toFixed(2)} €`,
   ];
   if (island) details.push(`otok +50% standardne cijene = ${island.toFixed(2)} €`);
   if (documentReturn) details.push(`povrat ovjerenog dokumenta +${documentReturn.toFixed(2)} €`);
@@ -886,12 +861,12 @@ export const calcSchenkerPallet = (input: PricingInput): PriceResult => {
   const base = SCHENKER_PALLET_RATES[originBand]?.[destinationBand] ?? null;
   if (base === null) return unavailable(id, "Schenker Paleta", "Schenker", serviceType, "Za ovu relaciju nema jednoznačne ugovorene Schenker paletne cijene.", "manual");
   const island = isAnyIsland(input.postalCode) ? base * SCHENKER_ISLAND_SURCHARGE : 0;
-  const fuel = base * SCHENKER_FUEL_SURCHARGE;
+  const fuel = base * FUEL_CONFIG.schenker.rate;
   const schedule = schenkerIslandSchedule(input.postalCode);
   const details = [
     `paleta do 600 kg; relacija ${input.originPostalCode} → ${input.postalCode}: ${base.toFixed(2)} €`,
     `procijenjena masa s europaletom: ${estimatedWeight.toFixed(2)} kg`,
-    `gorivo ${(SCHENKER_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.schenker.rate * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
     "čekanje na utovar/istovar uključeno do 20 min",
   ];
   if (island) details.push(`otok +50% standardne cijene = ${island.toFixed(2)} €`);
@@ -1085,14 +1060,14 @@ export const calcOverseasSingle = (input: PricingInput): PriceResult => {
   if (base === null) return unavailable(id, "Overseas single", "Overseas", serviceType, "Nema tarife za unesenu težinu.");
   const volumeDiscount = base * OVERSEAS_VOLUME_DISCOUNT;
   const discountedBase = base - volumeDiscount;
-  const fuel = discountedBase * OVERSEAS_FUEL_SURCHARGE;
+  const fuel = discountedBase * FUEL_CONFIG.overseas.rate;
   const remote = isOverseasRemote(input.postalCode) ? discountedBase * 0.2 : 0;
   const codFee = input.cod ? 0.3 : 0;
   const details = [
     `osnovna tarifa ${base.toFixed(2)} €`,
     `volumni popust 6% od 01.10.2026. = -${volumeDiscount.toFixed(2)} €`,
     `tarifa nakon popusta ${discountedBase.toFixed(2)} €`,
-    `gorivo ${(OVERSEAS_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.overseas.rate * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
   ];
   if (remote) details.push(`otok / posebni režim 20% = ${remote.toFixed(2)} €`);
   if (input.cod) details.push("COD +0,30 €");
@@ -1132,14 +1107,14 @@ export const calcOverseasMulti = (input: PricingInput): PriceResult => {
   if (base === null) return unavailable(id, "Overseas multi", "Overseas", serviceType, "Nema tarife za unesenu težinu.");
   const volumeDiscount = base * OVERSEAS_VOLUME_DISCOUNT;
   const discountedBase = base - volumeDiscount;
-  const fuel = discountedBase * OVERSEAS_FUEL_SURCHARGE;
+  const fuel = discountedBase * FUEL_CONFIG.overseas.rate;
   const remote = isOverseasRemote(input.postalCode) ? discountedBase * 0.2 : 0;
   const codFee = input.cod ? 0.3 : 0;
   const details = [
     `osnovna Multi tarifa ${base.toFixed(2)} €`,
     `volumni popust 6% od 01.10.2026. = -${volumeDiscount.toFixed(2)} €`,
     `tarifa nakon popusta ${discountedBase.toFixed(2)} €`,
-    `gorivo ${(OVERSEAS_FUEL_SURCHARGE * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.overseas.rate * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
   ];
   if (remote) details.push(`otok / posebni režim 20% = ${remote.toFixed(2)} €`);
   if (input.cod) details.push("COD +0,30 €");
@@ -1182,7 +1157,7 @@ export const calcInTime = (input: PricingInput): PriceResult => {
 
   const extraHundreds = chargeable > 3000 ? Math.ceil((chargeable - 3000) / 100) : 0;
   const weightSurcharge = extraHundreds * base * 0.10;
-  const fuel = base * INTIME_FUEL_SURCHARGE;
+  const fuel = base * FUEL_CONFIG.intime.rate;
   const seasonal = inTimeSeasonalSurchargeActive(input.pricingDate) ? base * INTIME_SEASONAL_SURCHARGE : 0;
   const nonStandardFee = input.inTimeOptions.nonStandard ? base : 0;
   const declaredValueFee = input.inTimeOptions.declaredValue > INTIME_DECLARED_VALUE_THRESHOLD
@@ -1203,7 +1178,7 @@ export const calcInTime = (input: PricingInput): PriceResult => {
     `InTime zona ${zone}; obračunska masa ${chargeable.toFixed(2)} kg`,
     `stvarna ${actual.toFixed(2)} kg / volumenska ${volumetric.toFixed(2)} kg (D × Š × V × 200 kg/m³)`,
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo 15% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.intime.rate * 100).toFixed(0)}% = ${fuel.toFixed(2)} €`,
   ];
   if (weightSurcharge) details.push(`iznad 3.000 kg: ${extraHundreds} × 10% osnovne cijene = ${weightSurcharge.toFixed(2)} €`);
   if (seasonal) details.push(`sezonski dodatak 15% (1.11.–31.12.) = ${seasonal.toFixed(2)} €`);
@@ -1304,12 +1279,12 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   const groups = optimizeOrderedGroups(input.packages, 80, input.packages.length, (weight) => lagermaxBase(zone, weight));
   if (!groups) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Pošiljku nije moguće rasporediti u pošiljke do 80 kg.");
   const base = groups.reduce((sum, group) => sum + group.base, 0);
-  const fuel = base * LAGERMAX_FUEL_SURCHARGE;
+  const fuel = base * FUEL_CONFIG.lagermax.rate;
   const island = anyIsland ? base * LAGERMAX_ISLAND_SURCHARGE : 0;
   const schedule = lagermaxIslandSchedule(input.postalCode);
   const details = [`relacija Z${originZone} → Z${destinationZone}; primijenjena skuplja Z${zone}`];
   details.push(...groups.map((group, index) => `pošiljka ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`));
-  details.push(`gorivo ${(LAGERMAX_FUEL_SURCHARGE * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`);
+  details.push(`gorivo ${(FUEL_CONFIG.lagermax.rate * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`);
   if (island) details.push(`otok 50% osnovne tarife = ${island.toFixed(2)} €`);
   if (schedule) details.push(`${schedule.label}: dostava ${schedule.schedule}`);
   return {
@@ -1433,13 +1408,13 @@ export const calcGLSExport = (input: PricingInput, tariff: ExportCountryTariff):
   }
   const base = exportBase(tariff.gls, input.packages);
   if (base === null) return unavailable(id, "GLS Export", "GLS", serviceType, "Nema GLS izvozne tarife za unesenu težinu.");
-  const fuel = base * GLS_EXPORT_FUEL;
+  const fuel = base * FUEL_CONFIG.gls.exportRate;
   const sms = GLS_EXPORT_SMS * input.packages.length;
   const codFee = input.cod ? 0.65 * input.packages.length : 0;
   const customs = tariff.region === "WW" ? 33.18 : 0;
   const details = [
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${(GLS_EXPORT_FUEL * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`,
+    `gorivo ${(FUEL_CONFIG.gls.exportRate * 100).toFixed(1).replace(".", ",")}% = ${fuel.toFixed(2)} €`,
     `FlexDelivery e-mail + SMS ${input.packages.length} × 1,13 € = ${sms.toFixed(2)} €`,
   ];
   if (codFee) details.push(`COD ${input.packages.length} × 0,65 € = ${codFee.toFixed(2)} €`);
@@ -1489,7 +1464,7 @@ export const calcDPDExport = (input: PricingInput, tariff: ExportCountryTariff):
   const customs = tariff.region === "WW" ? dpdExportCustoms(input) : 0;
   const details = [
     `osnovna tarifa ${base.toFixed(2)} €`,
-    `gorivo ${DPD_DIESEL_REFERENCE_MONTH} (${DPD_DIESEL_REFERENCE.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
+    `gorivo ${FUEL_CONFIG.dpd.referenceMonth} (${FUEL_CONFIG.dpd.dieselReference.toFixed(2)} €/l): ${input.packages.length} × ${DPD_ROAD_FUEL_PER_PACKAGE.toFixed(2)} € = ${fuel.toFixed(2)} €`,
   ];
   if (codFee) details.push(`COD ${input.packages.length} × ${codRate.toFixed(2)} € = ${codFee.toFixed(2)} €`);
   if (customs) details.push(`izvozno carinjenje +${customs.toFixed(2)} €`);
