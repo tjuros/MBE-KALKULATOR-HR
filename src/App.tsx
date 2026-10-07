@@ -9,6 +9,7 @@ import {
   type AdditionalServices,
   type CodPaymentMethod,
   type InTimeOptions,
+  type RecipientType,
   type CarrierStatus,
   type NumericPackageItem,
   type PriceResult,
@@ -279,6 +280,7 @@ export default function App() {
   const [originLocationStatus, setOriginLocationStatus] = useState<OriginLocationStatus>("idle");
   const [originLocationMessage, setOriginLocationMessage] = useState("");
   const [destinationCountry, setDestinationCountry] = useState("Croatia");
+  const [recipientType, setRecipientType] = useState<RecipientType>("private");
   const [postalCode, setPostalCode] = useState("");
   const [destinationPlace, setDestinationPlace] = useState("");
   const [goodsValue, setGoodsValue] = useState("");
@@ -371,6 +373,7 @@ export default function App() {
     destinationCountry,
     postalCode,
     destinationPlace,
+    recipientType,
     packages: numericPackages,
     cod,
     codAmount: parseNum(codAmount) ?? 0,
@@ -378,7 +381,7 @@ export default function App() {
     goodsValue: parseNum(goodsValue) ?? 0,
     additionalServices,
     inTimeOptions,
-  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, codPaymentMethod, goodsValue, additionalServices, inTimeOptions]);
+  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, numericPackages, cod, codAmount, codPaymentMethod, goodsValue, additionalServices, inTimeOptions]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -401,6 +404,7 @@ export default function App() {
     setPostalCode("");
     setDestinationPlace("");
     setGoodsValue("");
+    setRecipientType("private");
     setCod(false);
     setCodAmount("");
     setCodPaymentMethod("cash");
@@ -532,6 +536,17 @@ export default function App() {
                   <div style={{ fontSize: 12, color: "#92400e", marginTop: 5, lineHeight: 1.4 }}>
                     Ovaj poštanski broj pokriva više InTime zona ili različitu Overseas Cargo dostupnost. Bez točnog mjesta te će opcije ostati na ručnoj provjeri.
                   </div>
+                </div>
+              ) : null}
+
+              {isDomestic ? (
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Primatelj</label>
+                  <select value={recipientType} onChange={(event) => setRecipientType(event.target.value as RecipientType)} style={inputStyle()}>
+                    <option value="private">Fizička osoba</option>
+                    <option value="business">Pravna osoba / poslovni primatelj</option>
+                  </select>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Schenker ugovorene paketne i paletne cijene vrijede samo za poslovne primatelje.</div>
                 </div>
               ) : null}
 
@@ -718,6 +733,7 @@ export default function App() {
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
               <div>Polazište: <strong>{originPostalCode || "—"}</strong></div>
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
+              {isDomestic ? <div>Primatelj: <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div> : null}
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
               {isWorldwide ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "—"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
