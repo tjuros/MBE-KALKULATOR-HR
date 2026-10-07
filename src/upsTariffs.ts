@@ -31,7 +31,6 @@ export const UPS_REMOTE_RATE_PER_KG = 0.62; // Extended Area
 export const UPS_REMOTE_MINIMUM = 31.5; // Extended Area
 export const UPS_TRUE_REMOTE_RATE_PER_KG = 0.66;
 export const UPS_TRUE_REMOTE_MINIMUM = 32.5;
-export const UPS_RESIDENTIAL_DELIVERY = 3.40;
 export const UPS_US_PROCESSING_FEE = 2.35;
 
 export const UPS_SAVER_PACKAGE_RATES = {
