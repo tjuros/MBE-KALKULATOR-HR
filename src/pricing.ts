@@ -180,6 +180,9 @@ const HP_PARCEL: Tier[] = [
   { max: 5, price: 2.2 }, { max: 10, price: 2.8 }, { max: 15, price: 3.3 },
   { max: 20, price: 4.05 }, { max: 30, price: 5.45 },
 ];
+const HP_DOMESTIC_CONTRACT_VALID_UNTIL = "2026-10-31";
+const HP_PALLET_HEIGHT = 180;
+
 
 const OVERSEAS_SINGLE: Tier[] = [
   { max: 10, price: 2.61 }, { max: 20, price: 3.24 }, { max: 31.5, price: 3.52 },
@@ -703,17 +706,27 @@ const hpGroupPrice = (weight: number) => {
 export const calcHPParcel = (input: PricingInput): PriceResult => {
   const id = "hp-paket24";
   const serviceType: ServiceType = "MBE Economy";
+  if (input.pricingDate > HP_DOMESTIC_CONTRACT_VALID_UNTIL) {
+    return unavailable(id, "HP Paket24", "HP", serviceType, "MBE ugovorene HP cijene u kalkulatoru vrijede do 31.10.2026.; za pošiljke od 1.11.2026. potrebno je unijeti novi cjenik.", "manual");
+  }
   for (const item of input.packages) {
     const size = dimensions(item);
+    const sorted = [item.length, item.width, item.height].sort((a, b) => b - a);
+    if (sorted[0] < 14 || sorted[1] < 9) {
+      return unavailable(id, "HP Paket24", "HP", serviceType, "Paket24: najmanja adresna ploha pošiljke je 9 × 14 cm.");
+    }
     if (item.weight > 30 || size.longest > 60 || size.sum > 180) {
-      return unavailable(id, "HP Paket24", "HP", serviceType, "Paket24: najviše 30 kg po paketu, najdulja stranica 60 cm i zbroj stranica 180 cm.");
+      return unavailable(id, "HP Paket24", "HP", serviceType, "Paket24: najviše 30 kg po paketu, najdulja stranica 60 cm i zbroj stranica 180 cm. Pošiljka izvan tih uvjeta tretira se kao paletizirana ako ispunjava uvjete HP-a.");
     }
   }
   const groups = optimizeOrderedGroups(input.packages, 100, 10, hpGroupPrice);
   if (!groups) return unavailable(id, "HP Paket24", "HP", serviceType, "Pošiljku nije moguće rasporediti unutar 100 kg i 10 paketa po skupnoj pošiljci.");
   const base = groups.reduce((sum, group) => sum + group.base, 0);
   const codFee = input.cod ? 0.5 * groups.length : 0;
-  const details = groups.map((group, index) => `skupina ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`);
+  const details = [
+    `MBE ugovorena HP tarifa do 31.10.2026.`,
+    ...groups.map((group, index) => `skupina ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`),
+  ];
   if (input.cod) details.push(`COD ${groups.length} × 0,50 € = ${codFee.toFixed(2)} €`);
   const optional = addOptionalServices(base + codFee, input, {
     documentReturn: 1.59,
@@ -749,36 +762,40 @@ const getHpPalletZone = (postalCode: string): 1 | 2 | 3 | 4 | 5 | 6 | null => {
 export const calcHPPallet = (input: PricingInput): PriceResult => {
   const id = "hp-paleta";
   const serviceType: ServiceType = "MBE Economy";
-  if (input.packages.length < 2 && totalWeight(input.packages) <= 30) {
-    return unavailable(id, "HP Paleta", "HP", serviceType, "Paletna opcija prikazuje se za višekolične ili teže pošiljke.");
+  const outsidePaket24 = input.packages.some((item) => {
+    const size = dimensions(item);
+    return item.weight > 30 || size.longest > 60 || size.sum > 180;
+  });
+  if (input.packages.length < 2 && !outsidePaket24) {
+    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Paletna opcija prikazuje se za višekolične pošiljke ili pošiljke izvan Paket24 mase/dimenzija.");
   }
   if (input.cod || Object.values(input.additionalServices).some(Boolean)) {
-    return unavailable(id, "HP Paleta", "HP", serviceType, "Dodatne usluge za paletiziranu pošiljku nisu navedene u dostavljenoj ponudi.", "manual");
+    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Dodatne usluge za paletiziranu pošiljku nisu uključene u ovaj automatski izračun.", "manual");
   }
-  if (!input.packages.every((item) => fitsDimensions(item, [120, 80, 165]))) {
-    return unavailable(id, "HP Paleta", "HP", serviceType, "Najmanje jedan paket nije moguće smjestiti na EURO paletu 120 × 80 × 180 cm.");
+  if (!input.packages.every((item) => fitsDimensions(item, [120, 80, HP_PALLET_HEIGHT]))) {
+    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Najmanje jedan komad nije moguće smjestiti unutar maksimalnih dimenzija paletizirane pošiljke 120 × 80 × 180 cm.");
   }
   const estimatedWeight = totalWeight(input.packages) + 25;
-  if (estimatedWeight > 500 || totalVolume(input.packages) > 120 * 80 * 165) {
-    return unavailable(id, "HP Paleta", "HP", serviceType, "Procijenjena masa s paletom prelazi 500 kg ili ukupni volumen prelazi jednu EURO paletu.", "manual");
+  if (estimatedWeight > 500 || totalVolume(input.packages) > 120 * 80 * HP_PALLET_HEIGHT) {
+    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Procijenjena masa s EURO paletom prelazi 500 kg ili ukupni volumen prelazi jednu paletu 120 × 80 × 180 cm; potrebna je ručna potvrda HP-a.", "manual");
   }
   const zone = getHpPalletZone(input.postalCode);
   const rates: Record<1 | 2 | 3 | 4 | 5 | 6, number> = { 1: 30.56, 2: 49.04, 3: 55.04, 4: 70, 5: 90, 6: 90 };
-  if (!zone) return unavailable(id, "HP Paleta", "HP", serviceType, "HP paletna zona nije određena za uneseni poštanski broj.", "manual");
+  if (!zone) return unavailable(id, "HP Žurna paleta", "HP", serviceType, "HP paletna zona nije određena za uneseni poštanski broj.", "manual");
   return {
     id,
-    name: "HP Paleta (procjena)",
+    name: "HP Žurna paleta (procjena)",
     carrier: "HP",
     price: rates[zone],
     possible: true,
     details: [
       `HP paletna zona ${zone}: ${rates[zone].toFixed(2)} €`,
       `procijenjena masa s EURO paletom: ${estimatedWeight.toFixed(2)} kg`,
-      "rok D+5; preuzimanje, 3 SMS-a i e-mail uključeni",
+      "Žurna paletizirana pošiljka: rok do D+4; osigurana vrijednost 400,00 € i jedan pokušaj uručenja uključeni",
     ],
     serviceType,
     status: "surcharge",
-    warning: "Procjena pretpostavlja da sva roba fizički stane na jednu pravilno složenu EURO paletu; potvrditi pakiranje i konačnu masu.",
+    warning: "Procjena koristi cijenu Žurne paletizirane pošiljke. HP nakon preuzimanja mjeri stvarnu masu i dimenzije; pošiljke iznad 500 kg moguće su samo uz tehničku potvrdu i dodatnu naknadu.",
   };
 };
 
