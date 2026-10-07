@@ -183,6 +183,26 @@ const HP_PARCEL: Tier[] = [
 const HP_DOMESTIC_CONTRACT_VALID_UNTIL = "2026-10-31";
 const HP_PALLET_HEIGHT = 180;
 
+const HP_LOCKER_PRICE = 2.05;
+const HP_INCLUDED_INSURED_VALUE = 420;
+const HP_PALLET_INCLUDED_INSURED_VALUE = 400;
+const HP_PALLET_OVER_500_STEP = 15.04;
+const HP_PALLET_SUPPORTED_CITY_POSTALS = new Set([
+  "10000", "20000", "21000", "22000", "23000", "31000", "35000",
+  "42000", "43000", "44000", "47000", "51000", "52100", "53000",
+]);
+const HP_PALLET_SUPPORTED_CITIES = new Set([
+  "ZAGREB", "DUBROVNIK", "SPLIT", "SIBENIK", "ŠIBENIK", "ZADAR", "OSIJEK",
+  "SLAVONSKI BROD", "BJELOVAR", "VARAZDIN", "VARAŽDIN", "KARLOVAC", "SISAK",
+  "RIJEKA", "PULA", "GOSPIC", "GOSPIĆ",
+]);
+const HP_LOCKER_COMPARTMENTS: Array<[number, number, number]> = [
+  [9, 16, 64],
+  [9, 38, 64],
+  [19, 38, 64],
+  [39, 38, 64],
+];
+
 
 const OVERSEAS_SINGLE: Tier[] = [
   { max: 10, price: 2.61 }, { max: 20, price: 3.24 }, { max: 31.5, price: 3.52 },
@@ -726,6 +746,10 @@ export const calcHPParcel = (input: PricingInput): PriceResult => {
   const details = [
     `MBE ugovorena HP tarifa do 31.10.2026.`,
     ...groups.map((group, index) => `skupina ${index + 1}: ${group.count} pak. / ${group.weight.toFixed(2)} kg = ${group.base.toFixed(2)} €`),
+    "preuzimanje na adresi MBE centra uključeno",
+    "dodatak za preuzimanje i dostavu izvan naselja s HP popisa uključen",
+    "ručna obrada te izmjene COD iznosa, adrese i primatelja uključene",
+    `povrat Paket24 pošiljke uključen; osigurana vrijednost do ${HP_INCLUDED_INSURED_VALUE.toFixed(2)} € uključena`,
   ];
   if (input.cod) details.push(`COD ${groups.length} × 0,50 € = ${codFee.toFixed(2)} €`);
   const optional = addOptionalServices(base + codFee, input, {
@@ -743,7 +767,12 @@ export const calcHPParcel = (input: PricingInput): PriceResult => {
     details,
     serviceType,
     status: groups.length > 1 || input.cod || Object.values(input.additionalServices).some(Boolean) ? "surcharge" : "ok",
-    warning: groups.length > 1 ? `Potrebno je otvoriti ${groups.length} odvojene skupne pošiljke.` : undefined,
+    warning: [
+      groups.length > 1 ? `Potrebno je otvoriti ${groups.length} odvojene skupne pošiljke.` : "",
+      isAnyIsland(input.postalCode)
+        ? "Rok uručenja za otoke je D+3."
+        : "Rok je D+1 za naselja s HP popisa I zone, a za ostala naselja D+2; ugovorni dodatak za ta naselja je uključen u MBE cijenu.",
+    ].filter(Boolean).join(" "),
   };
 };
 
@@ -767,35 +796,86 @@ export const calcHPPallet = (input: PricingInput): PriceResult => {
     return item.weight > 30 || size.longest > 60 || size.sum > 180;
   });
   if (input.packages.length < 2 && !outsidePaket24) {
-    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Paletna opcija prikazuje se za višekolične pošiljke ili pošiljke izvan Paket24 mase/dimenzija.");
+    return unavailable(id, "HP Paleta", "HP", serviceType, "Paletna opcija prikazuje se za višekolične pošiljke ili pošiljke izvan Paket24 mase/dimenzija.");
   }
   if (input.cod || Object.values(input.additionalServices).some(Boolean)) {
-    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Dodatne usluge za paletiziranu pošiljku nisu uključene u ovaj automatski izračun.", "manual");
+    return unavailable(id, "HP Paleta", "HP", serviceType, "Dodatne usluge za paletiziranu pošiljku nisu uključene u ovaj automatski izračun.", "manual");
   }
   if (!input.packages.every((item) => fitsDimensions(item, [120, 80, HP_PALLET_HEIGHT]))) {
-    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Najmanje jedan komad nije moguće smjestiti unutar maksimalnih dimenzija paletizirane pošiljke 120 × 80 × 180 cm.");
+    return unavailable(id, "HP Paleta", "HP", serviceType, "Najmanje jedan komad nije moguće smjestiti unutar maksimalnih dimenzija paletizirane pošiljke 120 × 80 × 180 cm.");
   }
   const estimatedWeight = totalWeight(input.packages) + 25;
-  if (estimatedWeight > 500 || totalVolume(input.packages) > 120 * 80 * HP_PALLET_HEIGHT) {
-    return unavailable(id, "HP Žurna paleta", "HP", serviceType, "Procijenjena masa s EURO paletom prelazi 500 kg ili ukupni volumen prelazi jednu paletu 120 × 80 × 180 cm; potrebna je ručna potvrda HP-a.", "manual");
+  if (totalVolume(input.packages) > 120 * 80 * HP_PALLET_HEIGHT) {
+    return unavailable(id, "HP Paleta", "HP", serviceType, "Ukupni volumen prelazi jednu EURO paletu 120 × 80 × 180 cm; potrebna je ručna potvrda / raspodjela na više paleta.", "manual");
   }
+
+  const normalizedDestination = normalizePlace(input.destinationPlace);
+  const supportedCity = HP_PALLET_SUPPORTED_CITY_POSTALS.has(input.postalCode)
+    || (normalizedDestination ? HP_PALLET_SUPPORTED_CITIES.has(normalizedDestination) : false);
+  if (!supportedCity) {
+    return unavailable(id, "HP Paleta", "HP", serviceType, "Odredište nije na popisu gradova s automatski ugovorenom paletnom dostavom; za ostala odredišta HP navodi prethodni dogovor.", "manual");
+  }
+
   const zone = getHpPalletZone(input.postalCode);
   const rates: Record<1 | 2 | 3 | 4 | 5 | 6, number> = { 1: 30.56, 2: 49.04, 3: 55.04, 4: 70, 5: 90, 6: 90 };
-  if (!zone) return unavailable(id, "HP Žurna paleta", "HP", serviceType, "HP paletna zona nije određena za uneseni poštanski broj.", "manual");
+  if (!zone) return unavailable(id, "HP Paleta", "HP", serviceType, "HP paletna zona nije određena za uneseni poštanski broj.", "manual");
+
+  const over500Steps = estimatedWeight > 500 ? Math.ceil((estimatedWeight - 500) / 100) : 0;
+  const over500Fee = over500Steps * HP_PALLET_OVER_500_STEP;
+  const price = rates[zone] + over500Fee;
+  const details = [
+    `HP paletna zona ${zone}: ${rates[zone].toFixed(2)} €`,
+    `procijenjena masa s EURO paletom: ${estimatedWeight.toFixed(2)} kg`,
+    "EURO paleta 120 × 80 × 180 cm; rok uručenja D+5",
+    `preuzimanje, 3 korporativna SMS-a, e-mail i osigurana vrijednost do ${HP_PALLET_INCLUDED_INSURED_VALUE.toFixed(2)} € uključeni`,
+  ];
+  if (over500Fee) details.push(`iznad 500 kg: ${over500Steps} × ${HP_PALLET_OVER_500_STEP.toFixed(2)} € = ${over500Fee.toFixed(2)} €`);
+
   return {
     id,
-    name: "HP Žurna paleta (procjena)",
+    name: "HP Paleta (procjena)",
     carrier: "HP",
-    price: rates[zone],
+    price: round2(price),
     possible: true,
-    details: [
-      `HP paletna zona ${zone}: ${rates[zone].toFixed(2)} €`,
-      `procijenjena masa s EURO paletom: ${estimatedWeight.toFixed(2)} kg`,
-      "Žurna paletizirana pošiljka: rok do D+4; osigurana vrijednost 400,00 € i jedan pokušaj uručenja uključeni",
-    ],
+    details,
     serviceType,
     status: "surcharge",
-    warning: "Procjena koristi cijenu Žurne paletizirane pošiljke. HP nakon preuzimanja mjeri stvarnu masu i dimenzije; pošiljke iznad 500 kg moguće su samo uz tehničku potvrdu i dodatnu naknadu.",
+    warning: over500Fee
+      ? "Ponuda istodobno navodi maksimalnu masu 500 kg i doplatu iznad 500 kg; izračun prikazuje ugovornu doplatu, ali takvu pošiljku prije slanja treba potvrditi s HP-om."
+      : "Za odredišta izvan navedenog popisa gradova potreban je prethodni dogovor s HP-om.",
+  };
+};
+
+export const calcHPLocker = (input: PricingInput): PriceResult => {
+  const id = "hp-paketomat";
+  const serviceType: ServiceType = "MBE Paketomati";
+  if (input.pricingDate > HP_DOMESTIC_CONTRACT_VALID_UNTIL) {
+    return unavailable(id, "HP Paketomat", "HP", serviceType, "MBE ugovorena HP paketomat cijena u kalkulatoru vrijedi do 31.10.2026.; od 1.11.2026. potreban je novi cjenik.", "manual");
+  }
+  if (Object.values(input.additionalServices).some(Boolean)) {
+    return unavailable(id, "HP Paketomat", "HP", serviceType, "Dodatne usluge iz forme nisu dio ugovorene paketomat tarife.", "manual");
+  }
+  for (const item of input.packages) {
+    if (!HP_LOCKER_COMPARTMENTS.some((limits) => fitsDimensions(item, limits))) {
+      return unavailable(id, "HP Paketomat", "HP", serviceType, "Paket ne stane u najveći HP paketomat pretinac 39 × 38 × 64 cm.");
+    }
+  }
+  const base = HP_LOCKER_PRICE * input.packages.length;
+  return {
+    id,
+    name: "HP Paketomat",
+    carrier: "HP",
+    price: round2(base),
+    possible: true,
+    details: [
+      `${input.packages.length} × ${HP_LOCKER_PRICE.toFixed(2)} € = ${base.toFixed(2)} €`,
+      "sve veličine pretinca po istoj ugovorenoj cijeni",
+      "plaćanje pouzećem uključeno u cijenu",
+      `osigurana vrijednost do ${HP_INCLUDED_INSURED_VALUE.toFixed(2)} € uključena`,
+      "pretinci: XS 9×16×64, S 9×38×64, M 19×38×64, L 39×38×64 cm",
+    ],
+    serviceType,
+    status: input.cod ? "surcharge" : "ok",
   };
 };
 
@@ -1496,7 +1576,7 @@ export const calculatePrices = (input: PricingInput): PricingResults => {
     calcHPPallet(input),
   ]);
   const express = sortResults([calcGLS(input)]);
-  const lockers = sortResults([calcBoxNow(input), calcGLSLocker(input), calcDPDShop(input)]);
+  const lockers = sortResults([calcBoxNow(input), calcHPLocker(input), calcGLSLocker(input), calcDPDShop(input)]);
   const economyWinner = winner(economy);
   const expressWinner = winner(express);
   const lockerWinner = winner(lockers);
