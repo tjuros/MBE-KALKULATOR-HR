@@ -3,17 +3,30 @@ import { calculatePrices, exportCodCarriers, type NumericPackageItem, type Prici
 import { DESTINATION_COUNTRIES } from "../src/upsTariffs";
 
 const noExtras = { documentReturn: false, addresseeOnly: false, specialHandling: false };
+const noInTimeOptions = {
+  smsNotification: false,
+  pickupAttempt: false,
+  nonStandard: false,
+  otherProvider: false,
+  dataCorrection: false,
+  proofOfDelivery: false,
+  returnToSender: false,
+  declaredValue: 0,
+};
 const box = (weight: number, length: number, width: number, height: number): NumericPackageItem => ({ weight, length, width, height });
 const shipment = (overrides: Partial<PricingInput>): PricingInput => ({
   originPostalCode: "48260",
+  pricingDate: "2026-10-07",
   destinationCountry: "Croatia",
   postalCode: "10000",
   destinationPlace: "",
   packages: [box(1, 10, 10, 10)],
   cod: false,
   codAmount: 0,
+  codPaymentMethod: "cash",
   goodsValue: 0,
   additionalServices: noExtras,
+  inTimeOptions: noInTimeOptions,
   ...overrides,
 });
 
@@ -176,11 +189,66 @@ const longInTimeShipment = calculatePrices(shipment({
   postalCode: "10000",
   packages: [box(10, 310, 10, 10)],
 }));
-price(longInTimeShipment, "intime", 11.98);
-assert.equal(find(longInTimeShipment, "intime").status, "surcharge");
-assert.match(find(longInTimeShipment, "intime").details.join(" "), /nestandardna pošiljka \+100%/);
-assert.match(find(longInTimeShipment, "intime").warning ?? "", /prethodni dogovor i potvrdu InTimea/);
-assert.equal(longInTimeShipment.recommendedWinner?.id, "intime");
+price(longInTimeShipment, "intime", 6.41);
+assert.doesNotMatch(find(longInTimeShipment, "intime").details.join(" "), /nestandardna pošiljka/);
+
+const inTimeNonStandard = calculatePrices(shipment({
+  postalCode: "10000",
+  inTimeOptions: { ...noInTimeOptions, nonStandard: true },
+}));
+price(inTimeNonStandard, "intime", 8.39);
+assert.match(find(inTimeNonStandard, "intime").details.join(" "), /volumetrija nije primjenjiva.*\+100%/);
+
+const inTimeSeasonal = calculatePrices(shipment({
+  pricingDate: "2026-11-15",
+  postalCode: "10000",
+}));
+price(inTimeSeasonal, "intime", 5.07);
+assert.match(find(inTimeSeasonal, "intime").details.join(" "), /sezonski dodatak 15%/);
+
+const inTimeCardCod = calculatePrices(shipment({
+  postalCode: "10000",
+  cod: true,
+  codAmount: 40,
+  codPaymentMethod: "card",
+}));
+price(inTimeCardCod, "intime", 6.69);
+assert.match(find(inTimeCardCod, "intime").details.join(" "), /COD kartica 2,20%.*2\.20 €/);
+
+const inTimeDeclaredValue = calculatePrices(shipment({
+  postalCode: "10000",
+  inTimeOptions: { ...noInTimeOptions, declaredValue: 500 },
+}));
+price(inTimeDeclaredValue, "intime", 7.49);
+assert.match(find(inTimeDeclaredValue, "intime").details.join(" "), /iskazana vrijednost 500\.00 € × 0,60% = 3\.00 €/);
+
+const inTimeExtras = calculatePrices(shipment({
+  postalCode: "10000",
+  additionalServices: { ...noExtras, documentReturn: true, addresseeOnly: true },
+  inTimeOptions: {
+    ...noInTimeOptions,
+    smsNotification: true,
+    pickupAttempt: true,
+    otherProvider: true,
+    dataCorrection: true,
+    proofOfDelivery: true,
+  },
+}));
+price(inTimeExtras, "intime", 37.16);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /SMS status \+0\.12 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /pokušaj preuzimanja \+5\.00 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /drugog pružatelja \+8\.00 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /ispravak podataka \+2\.00 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /potvrda o isporuci \+5\.00 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /povrat ovjerenog dokumenta \+10\.00 €/);
+assert.match(find(inTimeExtras, "intime").details.join(" "), /osobno uručenje \+2\.55 €/);
+
+const inTimeReturnToSender = calculatePrices(shipment({
+  postalCode: "10000",
+  inTimeOptions: { ...noInTimeOptions, returnToSender: true },
+}));
+assert.equal(find(inTimeReturnToSender, "intime").status, "manual");
+assert.match(find(inTimeReturnToSender, "intime").details.join(" "), /Povrat pošiljatelju.*prema cjeniku/);
 
 const austria = calculatePrices(shipment({
   destinationCountry: "Austria",

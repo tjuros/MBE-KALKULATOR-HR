@@ -7,6 +7,8 @@ import {
   resolveInTimeZone,
   shipmentMetrics,
   type AdditionalServices,
+  type CodPaymentMethod,
+  type InTimeOptions,
   type CarrierStatus,
   type NumericPackageItem,
   type PriceResult,
@@ -29,10 +31,29 @@ const DEFAULT_ADDITIONAL_SERVICES: AdditionalServices = {
   specialHandling: false,
 };
 
+const DEFAULT_INTIME_OPTIONS: InTimeOptions = {
+  smsNotification: false,
+  pickupAttempt: false,
+  nonStandard: false,
+  otherProvider: false,
+  dataCorrection: false,
+  proofOfDelivery: false,
+  returnToSender: false,
+  declaredValue: 0,
+};
+
 const parseNum = (value: string) => {
   if (!value.trim()) return null;
   const parsed = Number(value.replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const localPricingDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 type OriginLocationStatus = "idle" | "locating" | "ok" | "error";
@@ -263,6 +284,9 @@ export default function App() {
   const [goodsValue, setGoodsValue] = useState("");
   const [cod, setCod] = useState(false);
   const [codAmount, setCodAmount] = useState("");
+  const [codPaymentMethod, setCodPaymentMethod] = useState<CodPaymentMethod>("cash");
+  const [additionalServices, setAdditionalServices] = useState<AdditionalServices>({ ...DEFAULT_ADDITIONAL_SERVICES });
+  const [inTimeOptions, setInTimeOptions] = useState<InTimeOptions>({ ...DEFAULT_INTIME_OPTIONS });
   const [packages, setPackages] = useState<PackageItem[]>([{ ...DEFAULT_FIRST_PACKAGE }]);
 
   const numericPackages = useMemo<NumericPackageItem[]>(() => packages.map((item) => ({
@@ -283,6 +307,7 @@ export default function App() {
     if (!codAvailable && cod) {
       setCod(false);
       setCodAmount("");
+      setCodPaymentMethod("cash");
     }
   }, [codAvailable, cod]);
 
@@ -342,15 +367,18 @@ export default function App() {
   const placeOptions = useMemo(() => getPlaceOptions(postalCode), [postalCode]);
   const results = useMemo(() => isReady ? calculatePrices({
     originPostalCode,
+    pricingDate: localPricingDate(),
     destinationCountry,
     postalCode,
     destinationPlace,
     packages: numericPackages,
     cod,
     codAmount: parseNum(codAmount) ?? 0,
+    codPaymentMethod,
     goodsValue: parseNum(goodsValue) ?? 0,
-    additionalServices: DEFAULT_ADDITIONAL_SERVICES,
-  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, goodsValue]);
+    additionalServices,
+    inTimeOptions,
+  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, numericPackages, cod, codAmount, codPaymentMethod, goodsValue, additionalServices, inTimeOptions]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -375,6 +403,9 @@ export default function App() {
     setGoodsValue("");
     setCod(false);
     setCodAmount("");
+    setCodPaymentMethod("cash");
+    setAdditionalServices({ ...DEFAULT_ADDITIONAL_SERVICES });
+    setInTimeOptions({ ...DEFAULT_INTIME_OPTIONS });
     setPackages([{ ...DEFAULT_FIRST_PACKAGE }]);
   };
   const commonInputProps = { onFocus: (event: FocusEvent<HTMLInputElement>) => event.target.select() };
@@ -521,11 +552,89 @@ export default function App() {
                 </div>
               ) : null}
               {cod ? (
-                <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Iznos pouzeća (€)</label>
-                  <input {...commonInputProps} type="text" inputMode="decimal" value={codAmount} onChange={(event) => setCodAmount(event.target.value)} placeholder="npr. 40" style={inputStyle()} />
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Primjenjuje se ugovoreni COD model svakog kurira.</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Iznos pouzeća (€)</label>
+                    <input {...commonInputProps} type="text" inputMode="decimal" value={codAmount} onChange={(event) => setCodAmount(event.target.value)} placeholder="npr. 40" style={inputStyle()} />
+                  </div>
+                  {isDomestic ? (
+                    <div>
+                      <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Način plaćanja pouzeća</label>
+                      <select value={codPaymentMethod} onChange={(event) => setCodPaymentMethod(event.target.value as CodPaymentMethod)} style={inputStyle()}>
+                        <option value="cash">Gotovina</option>
+                        <option value="card">Kartica</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Primjenjuje se ugovoreni COD model svakog kurira.</div>
                 </div>
+              ) : null}
+
+              {isDomestic ? (
+                <details style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 12px", background: "#f8fafc" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 900 }}>Dodatne usluge · po potrebi</summary>
+                  <div style={{ marginTop: 10, display: "grid", gap: 9 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={additionalServices.documentReturn}
+                        onChange={(event) => setAdditionalServices((current) => ({ ...current, documentReturn: event.target.checked }))}
+                      />
+                      Povrat otpremnice / ovjerenog dokumenta
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={additionalServices.addresseeOnly}
+                        onChange={(event) => setAdditionalServices((current) => ({ ...current, addresseeOnly: event.target.checked }))}
+                      />
+                      Osobno uručenje
+                    </label>
+
+                    <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px solid #e2e8f0", fontWeight: 900 }}>InTime ugovorne stavke</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.smsNotification} onChange={(event) => setInTimeOptions((current) => ({ ...current, smsNotification: event.target.checked }))} />
+                      SMS obavijest o statusu (+0,12 €)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.pickupAttempt} onChange={(event) => setInTimeOptions((current) => ({ ...current, pickupAttempt: event.target.checked }))} />
+                      Pokušaj preuzimanja (+5,00 €)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.dataCorrection} onChange={(event) => setInTimeOptions((current) => ({ ...current, dataCorrection: event.target.checked }))} />
+                      Naknadni ispravak podataka (+2,00 €)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.proofOfDelivery} onChange={(event) => setInTimeOptions((current) => ({ ...current, proofOfDelivery: event.target.checked }))} />
+                      Potvrda o isporuci (+5,00 €)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.otherProvider} onChange={(event) => setInTimeOptions((current) => ({ ...current, otherProvider: event.target.checked }))} />
+                      Isporuka putem drugog pružatelja (+8,00 €)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.nonStandard} onChange={(event) => setInTimeOptions((current) => ({ ...current, nonStandard: event.target.checked }))} style={{ marginTop: 3 }} />
+                      <span>Nestandardna pošiljka - volumetrijski obračun nije primjenjiv (+100% osnovne cijene)</span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={inTimeOptions.returnToSender} onChange={(event) => setInTimeOptions((current) => ({ ...current, returnToSender: event.target.checked }))} />
+                      Povrat pošiljatelju (prema cjeniku - ručna potvrda)
+                    </label>
+                    <div>
+                      <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>InTime iskazana vrijednost (€)</label>
+                      <input
+                        {...commonInputProps}
+                        type="text"
+                        inputMode="decimal"
+                        value={inTimeOptions.declaredValue ? String(inTimeOptions.declaredValue).replace(".", ",") : ""}
+                        onChange={(event) => setInTimeOptions((current) => ({ ...current, declaredValue: parseNum(event.target.value) ?? 0 }))}
+                        placeholder="0,00"
+                        style={inputStyle()}
+                      />
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>0,60% kada je iskazana vrijednost veća od 130 €, ugovoreno do najviše 2.000 €.</div>
+                    </div>
+                  </div>
+                </details>
               ) : null}
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
