@@ -46,6 +46,7 @@ export type AdditionalServices = {
 };
 
 export type PricingInput = {
+  originPostalCode: string;
   destinationCountry: string;
   postalCode: string;
   destinationPlace: string;
@@ -909,7 +910,10 @@ export const calcLagermax = (input: PricingInput): PriceResult => {
   if (input.cod || Object.values(input.additionalServices).some(Boolean)) {
     return unavailable(id, "Lagermax", "Lagermax", serviceType, "COD i odabrane dodatne usluge nisu navedeni u Lagermax ponudi.");
   }
-  const originZone = getLagermaxZone("48260");
+  if (!input.originPostalCode || input.originPostalCode.length !== 5) {
+    return unavailable(id, "Lagermax", "Lagermax", serviceType, "Za Lagermax je potreban poštanski broj polazišta radi izračuna zone.", "manual");
+  }
+  const originZone = getLagermaxZone(input.originPostalCode);
   const destinationZone = getLagermaxZone(input.postalCode);
   if (!originZone || !destinationZone) return unavailable(id, "Lagermax", "Lagermax", serviceType, "Polazište ili odredište nije pokriveno dostavljenom Lagermax zonskom tablicom.", "manual");
   const zone = Math.max(originZone, destinationZone) as Zone;
