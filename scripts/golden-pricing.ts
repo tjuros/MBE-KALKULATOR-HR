@@ -367,7 +367,7 @@ assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
 assert.match(find(austria, "hp-ems").details.join(" "), /osigurana vrijednost do 165,00 € uključena/);
 price(austria, "ups-standard", 15.1);
-price(austria, "ups-express-saver", 27.55);
+price(austria, "ups-express-saver", 26.63);
 assert.match(find(austria, "ups-standard").details.join(" "), /gorivo 34,00% \(od 05\.10\.2026\.\)/);
 assert.match(find(austria, "ups-express-saver").details.join(" "), /gorivo 53,25% \(od 05\.10\.2026\.\)/);
 assert.equal(austria.lockers.length, 0, "Export must not offer parcel lockers");
@@ -406,7 +406,7 @@ price(greatBritain, "gls-export", 42.11);
 price(greatBritain, "dpd-export", 44.25);
 price(greatBritain, "ups-standard", 63.5);
 assert.match(find(greatBritain, "ups-standard").details.join(" "), /non-Express \+40\.00 €/);
-price(greatBritain, "ups-express-saver", 37.35);
+price(greatBritain, "ups-express-saver", 36.44);
 
 const ukraine = calculatePrices(shipment({
   destinationCountry: "Ukraine",
@@ -424,7 +424,7 @@ const germanyVolumetric = calculatePrices(shipment({
   packages: [box(2, 50, 40, 30)],
 }));
 price(germanyVolumetric, "ups-standard", 27.39);
-price(germanyVolumetric, "ups-express-saver", 94.82);
+price(germanyVolumetric, "ups-express-saver", 89.3);
 assert.match(find(germanyVolumetric, "ups-standard").details.join(" "), /obračunska masa 12\.0 kg/);
 
 const germanyMulti = calculatePrices(shipment({
@@ -432,23 +432,23 @@ const germanyMulti = calculatePrices(shipment({
   packages: [box(0.6, 10, 10, 10), box(0.6, 10, 10, 10)],
 }));
 price(germanyMulti, "ups-standard", 22.81);
-price(germanyMulti, "ups-express-saver", 24.92);
+price(germanyMulti, "ups-express-saver", 24);
 assert.match(find(germanyMulti, "ups-standard").details.join(" "), /višepaketna pošiljka/);
 
 const germanyHandling = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(26, 50, 40, 30)],
 }));
-price(germanyHandling, "ups-standard", 41.19);
-price(germanyHandling, "ups-express-saver", 171.55);
+price(germanyHandling, "ups-standard", 54.19);
+price(germanyHandling, "ups-express-saver", 174.46);
 assert.match(find(germanyHandling, "ups-standard").details.join(" "), /dodatna manipulacija/);
 
 const germanyLarge = calculatePrices(shipment({
   destinationCountry: "Germany",
   packages: [box(10, 101, 50, 50)],
 }));
-price(germanyLarge, "ups-standard", 152.25);
-price(germanyLarge, "ups-express-saver", 379.11);
+price(germanyLarge, "ups-standard", 178.72);
+price(germanyLarge, "ups-express-saver", 386.16);
 assert.match(find(germanyLarge, "ups-standard").details.join(" "), /veliki paket/);
 assert.doesNotMatch(find(germanyLarge, "ups-standard").details.join(" "), /dodatna manipulacija/);
 
@@ -458,7 +458,7 @@ const usa = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 assert.equal(find(usa, "ups-standard").possible, false);
-price(usa, "ups-express-saver", 57.6);
+price(usa, "ups-express-saver", 56.69);
 assert.match(find(usa, "ups-express-saver").details.join(" "), /US International Processing Fee \+2\.35 €/);
 assert.equal(usa.recommendedWinner, null, "USA has no Economy tariff in the supplied UPS guide");
 assert.equal(usa.expressWinner?.id, "ups-express-saver");
@@ -470,7 +470,7 @@ const austriaPrivateRecipient = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 price(austriaPrivateRecipient, "ups-standard", 15.1);
-price(austriaPrivateRecipient, "ups-express-saver", 27.55);
+price(austriaPrivateRecipient, "ups-express-saver", 26.63);
 assert.match(find(austriaPrivateRecipient, "ups-standard").warning ?? "", /Residential Delivery nije automatski uključen/);
 
 const albania = calculatePrices(shipment({
@@ -479,7 +479,7 @@ const albania = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 assert.equal(find(albania, "ups-standard").possible, false);
-price(albania, "ups-express-saver", 128.32);
+price(albania, "ups-express-saver", 127.4);
 assert.match(find(albania, "ups-express-saver").details[0], /posebni Express Saver cjenik/);
 
 const upsOverMaximum = calculatePrices(shipment({
@@ -487,7 +487,7 @@ const upsOverMaximum = calculatePrices(shipment({
   packages: [box(71, 30, 20, 10)],
 }));
 assert.equal(find(upsOverMaximum, "ups-standard").status, "manual");
-assert.match(find(upsOverMaximum, "ups-standard").warning ?? "", /175\.00/);
+assert.match(find(upsOverMaximum, "ups-standard").warning ?? "", /346\.95/);
 
 const destinationValues = new Set(DESTINATION_COUNTRIES.map((country) => country.value));
 assert.ok(destinationValues.has("UPS:JP"), "UPS-only destinations must be selectable");
