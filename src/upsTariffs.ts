@@ -24,7 +24,18 @@ export const UPS_EXPRESS_SAVER_FUEL = FUEL_CONFIG.ups.expressRate;
 export const UPS_STANDARD_FUEL = FUEL_CONFIG.ups.standardRate;
 export const UPS_ADDITIONAL_HANDLING = 13.2;
 export const UPS_LARGE_PACKAGE = 54.75;
+// Regular UPS additional fees from the 2026 contract tariff. Peak-season fees
+// temporarily replace these amounts between 04.10.2026 and 06.02.2027.
 export const UPS_OVER_MAXIMUM = 346.95;
+export const UPS_PEAK_SEASON = {
+  from: "2026-10-04",
+  through: "2027-02-06",
+  expressPerKgZones1To7And703: 0.30,
+  expressPerKgZones8To11: 1.10,
+  additionalHandling: 3.50,
+  largePackage: 35.00,
+  overMaximum: 175.00,
+} as const;
 export const UPS_EXPORT_CLEARANCE = 6;
 export const UPS_NON_EXPRESS_CUSTOMS_BROKERAGE = 40;
 export const UPS_REMOTE_RATE_PER_KG = 0.62; // Extended Area
