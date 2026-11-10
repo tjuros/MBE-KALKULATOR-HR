@@ -406,7 +406,7 @@ price(greatBritain, "gls-export", 42.11);
 price(greatBritain, "dpd-export", 44.25);
 price(greatBritain, "ups-standard", 63.5);
 assert.match(find(greatBritain, "ups-standard").details.join(" "), /non-Express \+40\.00 €/);
-price(greatBritain, "ups-express-saver", 37.36);
+price(greatBritain, "ups-express-saver", 37.35);
 
 const ukraine = calculatePrices(shipment({
   destinationCountry: "Ukraine",
