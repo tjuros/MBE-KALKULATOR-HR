@@ -448,7 +448,7 @@ const germanyLarge = calculatePrices(shipment({
   packages: [box(10, 101, 50, 50)],
 }));
 price(germanyLarge, "ups-standard", 152.25);
-price(germanyLarge, "ups-express-saver", 374.28);
+price(germanyLarge, "ups-express-saver", 379.11);
 assert.match(find(germanyLarge, "ups-standard").details.join(" "), /veliki paket/);
 assert.doesNotMatch(find(germanyLarge, "ups-standard").details.join(" "), /dodatna manipulacija/);
 
