@@ -367,7 +367,7 @@ assert.match(find(austria, "gls-export").details.join(" "), /gorivo 13,2%/);
 price(austria, "hp-ems", 24);
 assert.match(find(austria, "hp-ems").details.join(" "), /osigurana vrijednost do 165,00 € uključena/);
 price(austria, "ups-standard", 15.1);
-price(austria, "ups-express-saver", 26.63);
+price(austria, "ups-express-saver", 27.55);
 assert.match(find(austria, "ups-standard").details.join(" "), /gorivo 34,00% \(od 05\.10\.2026\.\)/);
 assert.match(find(austria, "ups-express-saver").details.join(" "), /gorivo 53,25% \(od 05\.10\.2026\.\)/);
 assert.equal(austria.lockers.length, 0, "Export must not offer parcel lockers");
