@@ -28,14 +28,14 @@ edit('src/pricing.ts', [
 ]);
 
 edit('src/pricing.ts', [
-  ['warning: upsWarnings(country, false, input.postalCode),',
+  ['warning: upsWarnings(country, false),',
    'warning: [upsPeakSeasonActive(input.pricingDate) && peakSeasonFee > 0 ? `UPS Season Peak zaračunat: ${peakSeasonFee.toFixed(2)} € (${peakPerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg); na naknadu se obračunava gorivo.` : "", upsWarnings(country, false)].filter(Boolean).join(" ") || undefined,']
 ]);
 
 
 edit('src/pricing.ts', [
   ['  if (country.remotePossible) {\\n    warnings.push(`Za pojedine poštanske brojeve moguća je nadoplata: proširena lokacija ${UPS_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_REMOTE_MINIMUM.toFixed(2)} €; udaljena lokacija ${UPS_TRUE_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_TRUE_REMOTE_MINIMUM.toFixed(2)} €. Nije uključeno bez stranog poštanskog broja.`);\\n  }',
-   '  if (country.remotePossible && !postalCode.trim()) warnings.push("Unesite poštanski broj odredišta za UPS provjeru Extended/Remote Area naknade.");'],
+   '  if (country.remotePossible) warnings.push("UPS Extended/Remote Area naknada nije uključena; iznos ovisi o poštanskom broju primatelja.");'],
   ['  warnings.push("UPS Residential Delivery nije automatski uključen u izračun; vrsta primatelja se u kalkulatoru koristi samo za Lagermax/Schenker.");\\n','']
 ]);
 
@@ -46,51 +46,6 @@ edit('src/pricing.ts', [
   content = content.replace('Procjena: korištena je posljednja referenca goriva, koja još nije potvrđena za aktualno razdoblje.', '');
   fs.writeFileSync(file, content);
 }
-
-
-{
-  const { execFileSync } = require('node:child_process');
-  const encoded = execFileSync('curl', ['-fsSL', 'https://raw.githubusercontent.com/tjuros/MBE-KALKULATOR-HR/codex/ups-peak-season-2026/data/ups-area-surcharge.json.gz.b64'], { encoding: 'utf8' }).trim();
-  const moduleSource = [
-    'import { gunzipSync } from "node:zlib";',
-    'type Range = [string, string, string, 1 | 2];',
-    'const ranges = JSON.parse(gunzipSync(Buffer.from(' + JSON.stringify(encoded) + ', "base64")).toString("utf8")) as Range[];',
-    'const byCountry = new Map<string, Range[]>();',
-    'for (const row of ranges) { const bucket = byCountry.get(row[0]) ?? []; bucket.push(row); byCountry.set(row[0], bucket); }',
-    'export type UpsAreaMatch = { kind: "Extended Area" | "Remote Area"; perKg: number; minimum: number };',
-    'export function lookupUpsAreaSurcharge(countryCode: string, postalInput: string): UpsAreaMatch | null {',
-    '  const country = countryCode.toUpperCase();',
-    '  let postal = postalInput.trim().toUpperCase().replace(/[\\s-]/g, "");',
-    '  if (!postal) return null;',
-    '  if (country === "US" && /^\\d{9}$/.test(postal)) postal = postal.slice(0, 5);',
-    '  if (country === "GB") { const match = postal.match(/^([A-Z]{1,2}\\d[A-Z]?)\\d[A-Z]{2}$/); if (match) postal = match[1]; }',
-    '  const numericPostal = /^\\d+$/.test(postal) ? Number(postal) : null;',
-    '  let found: 1 | 2 | null = null;',
-    '  for (const [, low, high, kind] of byCountry.get(country) ?? []) {',
-    '    const numericRange = /^\\d+$/.test(low) && /^\\d+$/.test(high);',
-    '    const matches = numericRange && numericPostal !== null',
-    '      ? numericPostal >= Number(low) && numericPostal <= Number(high)',
-    '      : postal >= low && postal <= high;',
-    '    if (matches && (found === null || kind > found)) found = kind;',
-    '  }',
-    '  if (found === 1) return { kind: "Extended Area", perKg: 0.62, minimum: 31.50 };',
-    '  if (found === 2) return { kind: "Remote Area", perKg: 0.66, minimum: 32.50 };',
-    '  return null;',
-    '}',
-    ''
-  ].join('\n');
-  fs.writeFileSync('src/upsAreaSurcharges.ts', moduleSource);
-}
-
-edit('src/pricing.ts', [
-  ['export type NumericPackageItem = {', 'import { lookupUpsAreaSurcharge } from "./upsAreaSurcharges";\n\nexport type NumericPackageItem = {'],
-  ['const upsChargeSummary = (charges: UpsPackageCharge[]) => ({\n  billableWeight: charges.reduce((sum, charge) => sum + charge.billableWeight, 0),\n  largeCount: charges.filter((charge) => charge.large).length,\n  handlingCount: charges.filter((charge) => charge.additionalHandling).length,\n});\n\nexport const calcUPSStandard',
-   'const upsChargeSummary = (charges: UpsPackageCharge[]) => ({\n  billableWeight: charges.reduce((sum, charge) => sum + charge.billableWeight, 0),\n  largeCount: charges.filter((charge) => charge.large).length,\n  handlingCount: charges.filter((charge) => charge.additionalHandling).length,\n});\n\nconst upsAreaSurcharge = (country: UpsCountry, postalCode: string, billableWeight: number) => {\n  const match = lookupUpsAreaSurcharge(country.iso, postalCode);\n  return match ? { ...match, amount: Math.round(Math.max(match.perKg * billableWeight, match.minimum) * 100) / 100 } : null;\n};\n\nexport const calcUPSStandard'],
-  ['  const additionalFees = upsAdditionalFees(input.pricingDate);\n  const zone', '  const additionalFees = upsAdditionalFees(input.pricingDate);\n  const areaSurcharge = upsAreaSurcharge(country, input.postalCode, billableWeight);\n  const areaFee = areaSurcharge?.amount ?? 0;\n  const zone', 2],
-  ['  const fuelBasis = transport + largeFee + handlingFee;\n', '  const fuelBasis = transport + largeFee + handlingFee + areaFee;\n'],
-  ['  const fuelBasis = transport + largeFee + handlingFee + peakFee;\n', '  const fuelBasis = transport + largeFee + handlingFee + peakFee + areaFee;\n'],
-  ['  if (largeFee) details.push(`veliki paket', '  if (areaSurcharge) details.push("UPS " + areaSurcharge.kind + " (" + input.postalCode + "): " + areaSurcharge.perKg.toFixed(2) + " €/kg × " + billableWeight.toFixed(1) + " kg, minimum " + areaSurcharge.minimum.toFixed(2) + " € = " + areaFee.toFixed(2) + " €; na iznos se obračunava gorivo");\n  else if (input.postalCode.trim()) details.push("UPS provjera poštanskog broja " + input.postalCode + ": nema Extended/Remote Area naknade");\n  if (largeFee) details.push(`veliki paket', 2]
-]);
 
 edit('scripts/golden-pricing.ts', [
   ['price(austria, "ups-express-saver", 26.63);','price(austria, "ups-express-saver", 27.55);'],
