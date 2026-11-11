@@ -1558,7 +1558,19 @@ type UpsPackageCharge = {
 
 const roundUpHalfKg = (value: number) => Math.ceil((value - 1e-9) * 2) / 2;
 
-const upsPackageCharges = (input: PricingInput): UpsPackageCharge[] | PriceResult => {
+const UPS_PEAK_SEASON_START = "2026-10-04";
+const UPS_PEAK_SEASON_END = "2027-02-06";
+const upsSpecialFeesForDate = (pricingDate: string) => {
+  const peakSeason = pricingDate >= UPS_PEAK_SEASON_START && pricingDate <= UPS_PEAK_SEASON_END;
+  return {
+    peakSeason,
+    additionalHandling: peakSeason ? 3.5 : UPS_ADDITIONAL_HANDLING,
+    largePackage: peakSeason ? 35 : UPS_LARGE_PACKAGE,
+    overMaximum: peakSeason ? 175 : UPS_OVER_MAXIMUM,
+  };
+};
+
+const upsPackageCharges = (input: PricingInput, specialFees: ReturnType<typeof upsSpecialFeesForDate>): UpsPackageCharge[] | PriceResult => {
   const serviceType: ServiceType = "MBE Express";
   for (const item of input.packages) {
     const size = dimensions(item);
@@ -1568,7 +1580,7 @@ const upsPackageCharges = (input: PricingInput): UpsPackageCharge[] | PriceResul
         "UPS",
         "UPS",
         serviceType,
-        `UPS paket prelazi maksimalno ograničenje (70 kg, duljina 274 cm ili duljina + opseg 400 cm). UPS ga standardno ne prihvaća; ako ipak uđe u sustav, cjenik navodi doplatu ${UPS_OVER_MAXIMUM.toFixed(2)} € po paketu.`,
+        `UPS paket prelazi maksimalno ograničenje (70 kg, duljina 274 cm ili duljina + opseg 400 cm). UPS ga standardno ne prihvaća; ako ipak uđe u sustav, cjenik navodi doplatu ${specialFees.overMaximum.toFixed(2)} € po paketu (na koju se obračunava gorivo).`,
         "manual",
       );
     }
@@ -1633,7 +1645,8 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
   const selectionIssue = upsUnavailableForSelections(input, id, name, serviceType);
   if (selectionIssue) return selectionIssue;
 
-  const chargeResult = upsPackageCharges(input);
+  const specialFees = upsSpecialFeesForDate(input.pricingDate);
+  const chargeResult = upsPackageCharges(input, specialFees);
   if (!Array.isArray(chargeResult)) return { ...chargeResult, id, name, serviceType };
   const { billableWeight, largeCount, handlingCount } = upsChargeSummary(chargeResult);
   const zone = String(country.standardZone);
@@ -1651,8 +1664,8 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
   }
   if (transport === null) return unavailable(id, name, "UPS", serviceType, "Nema UPS Standard tarife za izračunatu obračunsku masu.", "manual");
 
-  const largeFee = largeCount * UPS_LARGE_PACKAGE;
-  const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
+  const largeFee = largeCount * specialFees.largePackage;
+  const handlingFee = handlingCount * specialFees.additionalHandling;
   const fuelBasis = transport + largeFee + handlingFee;
   const fuel = fuelBasis * UPS_STANDARD_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
@@ -1663,8 +1676,8 @@ export const calcUPSStandard = (input: PricingInput, country: UpsCountry): Price
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
     `osnovna tarifa ${transport.toFixed(2)} €`,
   ];
-  if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
-  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
+  if (largeFee) details.push(`veliki paket ${largeCount} × ${specialFees.largePackage.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
+  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${specialFees.additionalHandling.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
   details.push(`gorivo ${(UPS_STANDARD_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);
   if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
   if (nonExpressCustoms) details.push(`carinsko posredovanje za non-Express +${nonExpressCustoms.toFixed(2)} €`);
@@ -1692,7 +1705,8 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
   const selectionIssue = upsUnavailableForSelections(input, id, name, serviceType);
   if (selectionIssue) return selectionIssue;
 
-  const chargeResult = upsPackageCharges(input);
+  const specialFees = upsSpecialFeesForDate(input.pricingDate);
+  const chargeResult = upsPackageCharges(input, specialFees);
   if (!Array.isArray(chargeResult)) return { ...chargeResult, id, name, serviceType };
   const { billableWeight, largeCount, handlingCount } = upsChargeSummary(chargeResult);
   const zone = String(country.saverZone);
@@ -1708,9 +1722,13 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
     : upsOverWeightPrice(overWeightRate, billableWeight);
   if (transport === null) return unavailable(id, name, "UPS", serviceType, "Nema UPS Express Saver tarife za izračunatu obračunsku masu.", "manual");
 
-  const largeFee = largeCount * UPS_LARGE_PACKAGE;
-  const handlingFee = handlingCount * UPS_ADDITIONAL_HANDLING;
-  const fuelBasis = transport + largeFee + handlingFee;
+  const largeFee = largeCount * specialFees.largePackage;
+  const handlingFee = handlingCount * specialFees.additionalHandling;
+  const peakFeePerKg = specialFees.peakSeason
+    ? (country.saverZone === 703 || country.saverZone <= 7 ? 0.3 : 1.1)
+    : 0;
+  const peakFee = peakFeePerKg * billableWeight;
+  const fuelBasis = transport + largeFee + handlingFee + peakFee;
   const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;
   const exportClearance = country.region === "WW" ? UPS_EXPORT_CLEARANCE : 0;
   const usProcessing = input.destinationCountry === "UPS:US" ? UPS_US_PROCESSING_FEE : 0;
@@ -1719,9 +1737,10 @@ export const calcUPSExpressSaver = (input: PricingInput, country: UpsCountry): P
     `UPS obračunska masa ${billableWeight.toFixed(1)} kg`,
     `osnovna tarifa ${transport.toFixed(2)} €`,
   ];
-  if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
-  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
-  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);
+  if (peakFee) details.push(`UPS sezonska nadoplata zona ${country.saverZone}: ${peakFeePerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg = ${peakFee.toFixed(2)} €`);
+  if (largeFee) details.push(`veliki paket ${largeCount} × ${specialFees.largePackage.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);
+  if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${specialFees.additionalHandling.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);
+  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) primijenjeno i na UPS nadoplate = ${fuel.toFixed(2)} €`);
   if (exportClearance) details.push(`izvozno carinjenje +${exportClearance.toFixed(2)} €`);
   if (usProcessing) details.push(`US International Processing Fee +${usProcessing.toFixed(2)} €`);
 
