@@ -24,8 +24,14 @@ edit('src/pricing.ts', [
   ['  const fuelBasis = transport + largeFee + handlingFee;\n  const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;', '  const peakPerKg = upsPeakExpressPerKg(input.pricingDate, country.saverZone);\n  const peakSeasonFee = billableWeight * peakPerKg;\n  const fuelBasis = transport + largeFee + handlingFee + peakSeasonFee;\n  const fuel = fuelBasis * UPS_EXPRESS_SAVER_FUEL;'],
   ['if (largeFee) details.push(`veliki paket ${largeCount} × ${UPS_LARGE_PACKAGE.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu`);', 'if (largeFee) details.push(`veliki paket ${largeCount} × ${additionalFees.large.toFixed(2)} € = ${largeFee.toFixed(2)} €; minimalno 40 kg po takvom paketu${upsPeakSeasonActive(input.pricingDate) ? " (privremeni iznos do 06.02.2027.)" : ""}`);', 2],
   ['if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${UPS_ADDITIONAL_HANDLING.toFixed(2)} € = ${handlingFee.toFixed(2)} €`);', 'if (handlingFee) details.push(`dodatna manipulacija ${handlingCount} × ${additionalFees.handling.toFixed(2)} € = ${handlingFee.toFixed(2)} €${upsPeakSeasonActive(input.pricingDate) ? " (privremeni iznos do 06.02.2027.)" : ""}`);', 2],
-  ['  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);', '  if (peakSeasonFee) details.push(`sezonska naknada za povećanu potražnju (${peakPerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg) = ${peakSeasonFee.toFixed(2)} €; vrijedi 04.10.2026.–06.02.2027. i na nju se obračunava gorivo`);\n  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);']
+  ['  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);', '  if (peakSeasonFee) details.push(`UPS Season Peak – sezonska naknada za povećanu potražnju (${peakPerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg) = ${peakSeasonFee.toFixed(2)} €; vrijedi 04.10.2026.–06.02.2027. i na nju se obračunava gorivo`);\n  details.push(`gorivo ${(UPS_EXPRESS_SAVER_FUEL * 100).toFixed(2).replace(".", ",")}% (od ${UPS_FUEL_EFFECTIVE_FROM}) = ${fuel.toFixed(2)} €`);']
 ]);
+
+edit('src/pricing.ts', [
+  ['warning: upsWarnings(country, false),',
+   'warning: [upsPeakSeasonActive(input.pricingDate) && peakSeasonFee > 0 ? `UPS Season Peak zaračunat: ${peakSeasonFee.toFixed(2)} € (${peakPerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg); na naknadu se obračunava gorivo.` : "", upsWarnings(country, false)].filter(Boolean).join(" ") || undefined,']
+]);
+
 edit('scripts/golden-pricing.ts', [
   ['price(austria, "ups-express-saver", 26.63);','price(austria, "ups-express-saver", 27.55);'],
   ['price(greatBritain, "ups-express-saver", 36.44);','price(greatBritain, "ups-express-saver", 37.35);'],
