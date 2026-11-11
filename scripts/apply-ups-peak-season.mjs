@@ -39,6 +39,14 @@ edit('src/pricing.ts', [
   ['  warnings.push("UPS Residential Delivery nije automatski uključen u izračun; vrsta primatelja se u kalkulatoru koristi samo za Lagermax/Schenker.");\\n','']
 ]);
 
+
+{
+  const file = 'src/server/results.ts';
+  let content = fs.readFileSync(file, 'utf8');
+  content = content.replace('Procjena: korištena je posljednja referenca goriva, koja još nije potvrđena za aktualno razdoblje.', '');
+  fs.writeFileSync(file, content);
+}
+
 edit('scripts/golden-pricing.ts', [
   ['price(austria, "ups-express-saver", 26.63);','price(austria, "ups-express-saver", 27.55);'],
   ['price(greatBritain, "ups-express-saver", 36.44);','price(greatBritain, "ups-express-saver", 37.35);'],
