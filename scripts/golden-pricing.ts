@@ -471,7 +471,7 @@ const austriaPrivateRecipient = calculatePrices(shipment({
 }));
 price(austriaPrivateRecipient, "ups-standard", 15.1);
 price(austriaPrivateRecipient, "ups-express-saver", 27.55);
-assert.match(find(austriaPrivateRecipient, "ups-standard").warning ?? "", /Residential Delivery nije automatski uključen/);
+assert.match(find(austriaPrivateRecipient, "ups-standard").warning ?? "", /Unesite poštanski broj odredišta/);
 
 const albania = calculatePrices(shipment({
   destinationCountry: "UPS:AL",
