@@ -32,6 +32,13 @@ edit('src/pricing.ts', [
    'warning: [upsPeakSeasonActive(input.pricingDate) && peakSeasonFee > 0 ? `UPS Season Peak zaračunat: ${peakSeasonFee.toFixed(2)} € (${peakPerKg.toFixed(2)} €/kg × ${billableWeight.toFixed(1)} kg); na naknadu se obračunava gorivo.` : "", upsWarnings(country, false)].filter(Boolean).join(" ") || undefined,']
 ]);
 
+
+edit('src/pricing.ts', [
+  ['  if (country.remotePossible) {\\n    warnings.push(`Za pojedine poštanske brojeve moguća je nadoplata: proširena lokacija ${UPS_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_REMOTE_MINIMUM.toFixed(2)} €; udaljena lokacija ${UPS_TRUE_REMOTE_RATE_PER_KG.toFixed(2)} €/kg, min. ${UPS_TRUE_REMOTE_MINIMUM.toFixed(2)} €. Nije uključeno bez stranog poštanskog broja.`);\\n  }',
+   '  if (country.remotePossible) warnings.push("UPS Extended/Remote Area naknada nije uključena; iznos ovisi o poštanskom broju primatelja.");'],
+  ['  warnings.push("UPS Residential Delivery nije automatski uključen u izračun; vrsta primatelja se u kalkulatoru koristi samo za Lagermax/Schenker.");\\n','']
+]);
+
 edit('scripts/golden-pricing.ts', [
   ['price(austria, "ups-express-saver", 26.63);','price(austria, "ups-express-saver", 27.55);'],
   ['price(greatBritain, "ups-express-saver", 36.44);','price(greatBritain, "ups-express-saver", 37.35);'],
