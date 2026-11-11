@@ -470,7 +470,7 @@ const austriaPrivateRecipient = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 price(austriaPrivateRecipient, "ups-standard", 15.1);
-price(austriaPrivateRecipient, "ups-express-saver", 26.63);
+price(austriaPrivateRecipient, "ups-express-saver", 27.55);
 assert.match(find(austriaPrivateRecipient, "ups-standard").warning ?? "", /Residential Delivery nije automatski uključen/);
 
 const albania = calculatePrices(shipment({
