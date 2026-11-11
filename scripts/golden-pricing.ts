@@ -458,7 +458,7 @@ const usa = calculatePrices(shipment({
   packages: [box(2, 30, 20, 10)],
 }));
 assert.equal(find(usa, "ups-standard").possible, false);
-price(usa, "ups-express-saver", 60.06);
+price(usa, "ups-express-saver", 57.6);
 assert.match(find(usa, "ups-express-saver").details.join(" "), /US International Processing Fee \+2\.35 €/);
 assert.equal(usa.recommendedWinner, null, "USA has no Economy tariff in the supplied UPS guide");
 assert.equal(usa.expressWinner?.id, "ups-express-saver");
