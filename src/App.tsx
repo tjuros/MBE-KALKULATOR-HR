@@ -15,7 +15,8 @@ import {
   type PriceResult,
   type ServiceType,
 } from "./pricing";
-import { DESTINATION_COUNTRIES } from "./upsTariffs";
+import { DESTINATION_COUNTRIES, getUpsCountry } from "./upsTariffs";
+import { hasUpsAreaSurchargePostcodeData, loadUpsAreaSurchargeData, lookupUpsAreaSurcharge } from "./upsAreaSurchargeData";
 
 type PackageItem = {
   weight: string;
@@ -282,6 +283,8 @@ export default function App() {
   const [destinationCountry, setDestinationCountry] = useState("Croatia");
   const [recipientType, setRecipientType] = useState<RecipientType>("private");
   const [postalCode, setPostalCode] = useState("");
+  const [upsAreaDataLoaded, setUpsAreaDataLoaded] = useState(false);
+  const [upsAreaDataError, setUpsAreaDataError] = useState(false);
   const [destinationPlace, setDestinationPlace] = useState("");
   const [goodsValue, setGoodsValue] = useState("");
   const [cod, setCod] = useState(false);
@@ -299,9 +302,26 @@ export default function App() {
   })), [packages]);
 
   const selectedExportCountry = useMemo(() => DESTINATION_COUNTRIES.find((country) => country.value === destinationCountry), [destinationCountry]);
+  const selectedUpsCountry = useMemo(() => getUpsCountry(destinationCountry), [destinationCountry]);
   const isDomestic = destinationCountry === "Croatia";
   const isWorldwide = selectedExportCountry?.region === "WW";
   const destinationLabel = isDomestic ? "Hrvatska" : selectedExportCountry?.label ?? destinationCountry;
+  const showUpsPostalCode = Boolean(!isDomestic && selectedUpsCountry
+    && (selectedUpsCountry.remotePossible || hasUpsAreaSurchargePostcodeData(selectedUpsCountry.iso)));
+  const upsAreaLookup = selectedUpsCountry
+    ? lookupUpsAreaSurcharge(selectedUpsCountry.iso, postalCode, selectedUpsCountry.remotePossible)
+    : "none";
+
+  useEffect(() => {
+    if (!showUpsPostalCode || upsAreaDataLoaded || upsAreaDataError) return;
+    let active = true;
+    loadUpsAreaSurchargeData().then(() => {
+      if (active) setUpsAreaDataLoaded(true);
+    }).catch(() => {
+      if (active) setUpsAreaDataError(true);
+    });
+    return () => { active = false; };
+  }, [showUpsPostalCode, upsAreaDataLoaded, upsAreaDataError]);
   const exportCodOptions = useMemo(() => isDomestic ? [] : exportCodCarriers(destinationCountry), [isDomestic, destinationCountry]);
   const codAvailable = isDomestic || exportCodOptions.length > 0;
 
@@ -381,7 +401,7 @@ export default function App() {
     goodsValue: parseNum(goodsValue) ?? 0,
     additionalServices,
     inTimeOptions,
-  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, numericPackages, cod, codAmount, codPaymentMethod, goodsValue, additionalServices, inTimeOptions]);
+  }) : null, [isReady, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, numericPackages, cod, codAmount, codPaymentMethod, goodsValue, additionalServices, inTimeOptions, upsAreaDataLoaded, upsAreaDataError]);
 
   const metrics = useMemo(() => shipmentMetrics(numericPackages), [numericPackages]);
   const inTimeZone = useMemo(() => resolveInTimeZone(postalCode, destinationPlace), [postalCode, destinationPlace]);
@@ -509,6 +529,37 @@ export default function App() {
                     placeholder="npr. 33000"
                     style={inputStyle()}
                   />
+                </div>
+              ) : null}
+
+              {showUpsPostalCode ? (
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>UPS poštanski broj odredišta</label>
+                  <input
+                    {...commonInputProps}
+                    type="text"
+                    autoComplete="postal-code"
+                    value={postalCode}
+                    onChange={(event) => setPostalCode(event.target.value.toUpperCase())}
+                    placeholder="upiši poštanski broj odredišta"
+                    maxLength={16}
+                    style={inputStyle()}
+                  />
+                  <div style={{ fontSize: 12, color: upsAreaLookup === "remote" || upsAreaLookup === "extended" ? "#92400e" : "#64748b", marginTop: 5, lineHeight: 1.4 }}>
+                    {upsAreaLookup === "remote"
+                      ? "UPS udaljena lokacija: nadoplata je uključena u cijenu, a gorivo se obračunava i na nju."
+                      : upsAreaLookup === "extended"
+                        ? "UPS proširena lokacija: nadoplata je uključena u cijenu, a gorivo se obračunava i na nju."
+                        : upsAreaLookup === "city-check"
+                          ? "UPS za ovu državu navodi i lokacije koje se provjeravaju po gradu. Poštanski broj nije dovoljan za automatsku potvrdu."
+                        : upsAreaLookup === "not-loaded"
+                          ? "Učitavam UPS popis lokacija…"
+                          : upsAreaLookup === "load-error"
+                            ? "UPS popis trenutačno nije dostupan. Provjeri adresu prije slanja."
+                          : upsAreaLookup === "none"
+                            ? "UPS popis ne navodi proširenu ili udaljenu lokaciju za ovaj poštanski broj."
+                            : "Unesi poštanski broj kako bi kalkulator provjerio UPS proširenu ili udaljenu lokaciju."}
+                  </div>
                 </div>
               ) : null}
 
@@ -737,6 +788,7 @@ export default function App() {
               <div>Država odredišta: <strong>{destinationLabel}</strong></div>
               {isDomestic ? <div>Primatelj (Lagermax / Schenker): <strong>{recipientType === "business" ? "pravna osoba" : "fizička osoba"}</strong></div> : null}
               {isDomestic ? <div>Odredište: <strong>{destinationPlace ? `${postalCode} ${destinationPlace}` : postalCode || "—"}</strong></div> : null}
+              {showUpsPostalCode ? <div>UPS poštanski broj odredišta: <strong>{postalCode || "nije unesen"}</strong></div> : null}
               {!isDomestic ? <div>Vrijednost robe: <strong>{(parseNum(goodsValue) ?? 0) > 0 ? money(parseNum(goodsValue)) : "nije unesena"}</strong></div> : null}
               <div>Broj paketa: <strong>{packages.length}</strong></div>
               <div>Stvarna masa: <strong>{metrics.actualWeight.toFixed(2)} kg</strong></div>
