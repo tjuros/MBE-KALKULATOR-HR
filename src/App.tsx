@@ -477,8 +477,12 @@ export default function App() {
   const matrixFrom = Math.max(1, Math.ceil(parseNum(matrixWeightFrom) ?? 1));
   const matrixTo = Math.min(100, Math.floor(parseNum(matrixWeightTo) ?? 30));
   const matrixHasServices = matrixEconomy || matrixExpress || (isDomestic && matrixLockers);
+  const matrixReady = (!isDomestic || postalCode.length === 5)
+    && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
+    && numericPackages.length > 0
+    && [numericPackages[0]?.length, numericPackages[0]?.width, numericPackages[0]?.height].every((value) => value !== undefined && value > 0);
   const matrixRows = useMemo(() => {
-    if (!matrixOpen || !isReady || !matrixHasServices || matrixFrom > matrixTo) return [];
+    if (!matrixOpen || !matrixReady || !matrixHasServices || matrixFrom > matrixTo) return [];
     const firstPackage = numericPackages[0] ?? { weight: 1, length: 30, width: 20, height: 10 };
     const rows = [];
     for (let weight = matrixFrom; weight <= matrixTo; weight += 1) {
@@ -500,7 +504,7 @@ export default function App() {
       rows.push({ weight, prices });
     }
     return rows;
-  }, [matrixOpen, isReady, matrixHasServices, matrixFrom, matrixTo, numericPackages, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, goodsValue, upsAreaDataLoaded, upsAreaDataError]);
+  }, [matrixOpen, matrixReady, matrixHasServices, matrixFrom, matrixTo, numericPackages, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, goodsValue, upsAreaDataLoaded, upsAreaDataError]);
   const matrixPriceCell = (result: PriceResult | null) => result?.price !== null && result?.price !== undefined ? (
     <div style={{ display: "grid", gap: 3 }}>
       <strong style={{ fontSize: 12, lineHeight: 1.3 }}>{result.name}</strong>
@@ -905,8 +909,8 @@ export default function App() {
                 <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Provjeri raspon težina.</div>
               ) : !matrixHasServices ? (
                 <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Odaberi barem jednu uslugu.</div>
-              ) : !isReady ? (
-                <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 800 }}>Za matricu najprije unesi obavezne podatke o odredištu i paketu.</div>
+              ) : !matrixReady ? (
+                <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 800 }}>Za matricu najprije unesi obavezne podatke o odredištu i dimenzijama paketa 1.</div>
               ) : matrixRows.length ? (
                 <div style={{ marginTop: 12, overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 13 }}>
