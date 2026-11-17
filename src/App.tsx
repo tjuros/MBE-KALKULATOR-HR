@@ -325,6 +325,12 @@ export default function App() {
   const [customerMargin, setCustomerMargin] = useState("0");
   const [customerMarginMode, setCustomerMarginMode] = useState<CustomerMarginMode>("percent");
   const [customerPriceIncludesVat, setCustomerPriceIncludesVat] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+  const [matrixWeightFrom, setMatrixWeightFrom] = useState("1");
+  const [matrixWeightTo, setMatrixWeightTo] = useState("30");
+  const [matrixEconomy, setMatrixEconomy] = useState(true);
+  const [matrixExpress, setMatrixExpress] = useState(true);
+  const [matrixLockers, setMatrixLockers] = useState(true);
 
   const numericPackages = useMemo<NumericPackageItem[]>(() => packages.map((item) => ({
     weight: parseNum(item.weight) ?? 0,
@@ -468,6 +474,40 @@ export default function App() {
   const additionalPackages = packages.slice(1);
   const numericCustomerMargin = parseNum(customerMargin) ?? 0;
   const getCustomerPrice = (price: number | null) => customerPriceFor(price, numericCustomerMargin, customerMarginMode, customerPriceIncludesVat);
+  const matrixFrom = Math.max(1, Math.ceil(parseNum(matrixWeightFrom) ?? 1));
+  const matrixTo = Math.min(100, Math.floor(parseNum(matrixWeightTo) ?? 30));
+  const matrixHasServices = matrixEconomy || matrixExpress || (isDomestic && matrixLockers);
+  const matrixRows = useMemo(() => {
+    if (!matrixOpen || !isReady || !matrixHasServices || matrixFrom > matrixTo) return [];
+    const firstPackage = numericPackages[0] ?? { weight: 1, length: 30, width: 20, height: 10 };
+    const rows = [];
+    for (let weight = matrixFrom; weight <= matrixTo; weight += 1) {
+      const prices = calculatePrices({
+        originPostalCode,
+        pricingDate: localPricingDate(),
+        destinationCountry,
+        postalCode,
+        destinationPlace,
+        recipientType,
+        packages: [{ ...firstPackage, weight }],
+        cod: false,
+        codAmount: 0,
+        codPaymentMethod: "cash",
+        goodsValue: parseNum(goodsValue) ?? 0,
+        additionalServices: DEFAULT_ADDITIONAL_SERVICES,
+        inTimeOptions: DEFAULT_INTIME_OPTIONS,
+      });
+      rows.push({ weight, prices });
+    }
+    return rows;
+  }, [matrixOpen, isReady, matrixHasServices, matrixFrom, matrixTo, numericPackages, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, goodsValue, upsAreaDataLoaded, upsAreaDataError]);
+  const matrixPriceCell = (result: PriceResult | null) => result?.price !== null && result?.price !== undefined ? (
+    <div style={{ display: "grid", gap: 3 }}>
+      <strong style={{ fontSize: 12, lineHeight: 1.3 }}>{result.name}</strong>
+      <span style={{ color: "#64748b", fontSize: 11 }}>Ulazno: {money(result.price)}</span>
+      <strong style={{ color: "#b91c1c", fontSize: 13 }}>Kupcu: {money(getCustomerPrice(result.price))}</strong>
+    </div>
+  ) : <span style={{ color: "#94a3b8" }}>Nema cijene</span>;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", padding: isMobile ? 12 : 16, paddingBottom: isMobile ? 160 : 18, fontFamily: "Ubuntu, Arial, sans-serif" }}>
@@ -830,6 +870,70 @@ export default function App() {
         <ResultSection title="MBE Economy · usporedba kurira" results={results?.economy ?? null} winner={results?.economyWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} defaultOpen />
         <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} />
         {isDomestic ? <ResultSection title="Paketomati · dodatna mogućnost" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} /> : null}
+
+        <section style={cardStyle()}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 17 }}>Matrica cijena po težinama</div>
+              <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>Odredište: {destinationLabel}{postalCode ? ` · ${postalCode}` : ""}</div>
+            </div>
+            <button style={buttonStyle(true)} onClick={() => setMatrixOpen((current) => !current)}>
+              {matrixOpen ? "Sakrij matricu" : "Prikaži matricu"}
+            </button>
+          </div>
+          {matrixOpen ? (
+            <>
+              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "150px 150px 1fr", gap: 10, alignItems: "end" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Od (kg)</label>
+                  <input type="number" min="1" max="100" step="1" value={matrixWeightFrom} onChange={(event) => setMatrixWeightFrom(event.target.value)} style={inputStyle()} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Do (kg)</label>
+                  <input type="number" min="1" max="100" step="1" value={matrixWeightTo} onChange={(event) => setMatrixWeightTo(event.target.value)} style={inputStyle()} />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", minHeight: 44 }}>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixEconomy} onChange={(event) => setMatrixEconomy(event.target.checked)} /> Economy</label>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixExpress} onChange={(event) => setMatrixExpress(event.target.checked)} /> Express</label>
+                  {isDomestic ? <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixLockers} onChange={(event) => setMatrixLockers(event.target.checked)} /> Paketomati</label> : null}
+                </div>
+              </div>
+              <div style={{ marginTop: 8, color: "#64748b", fontSize: 12, lineHeight: 1.4 }}>
+                Računa se po 1 kg, za jedan paket dimenzija paketa 1. Koriste se uneseni poštanski brojevi; pouzeće i dodatne usluge nisu uključeni.
+              </div>
+              {matrixFrom > matrixTo ? (
+                <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Provjeri raspon težina.</div>
+              ) : !matrixHasServices ? (
+                <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Odaberi barem jednu uslugu.</div>
+              ) : !isReady ? (
+                <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 800 }}>Za matricu najprije unesi obavezne podatke o odredištu i paketu.</div>
+              ) : matrixRows.length ? (
+                <div style={{ marginTop: 12, overflowX: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc", textAlign: "left" }}>
+                        <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>Težina</th>
+                        {matrixEconomy ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>MBE Economy</th> : null}
+                        {matrixExpress ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>MBE Express</th> : null}
+                        {isDomestic && matrixLockers ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>Paketomati</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matrixRows.map((row) => (
+                        <tr key={row.weight}>
+                          <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", fontWeight: 900, whiteSpace: "nowrap" }}>{row.weight} kg</td>
+                          {matrixEconomy ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.economyWinner)}</td> : null}
+                          {matrixExpress ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.expressWinner)}</td> : null}
+                          {isDomestic && matrixLockers ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.lockerWinner)}</td> : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </section>
       </div>
 
       <div style={{ position: isMobile ? "fixed" : "sticky", left: 0, right: 0, bottom: 0, zIndex: 30, padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : 0, background: isMobile ? "rgba(248,250,252,.96)" : "transparent", backdropFilter: isMobile ? "blur(10px)" : "none", borderTop: isMobile ? "1px solid #e5e7eb" : "none", marginTop: 14 }}>
