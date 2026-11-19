@@ -94,16 +94,6 @@ const money = (value: number | null) => value === null
   ? "—"
   : new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(value);
 
-type CustomerMarginMode = "percent" | "fixed";
-
-const customerPriceFor = (price: number | null, margin: number, mode: CustomerMarginMode, includeVat: boolean) => {
-  if (price === null) return null;
-  const safeMargin = Math.max(0, margin);
-  const netPrice = mode === "fixed" ? price + safeMargin : price * (1 + safeMargin / 100);
-  const total = netPrice * (includeVat ? 1.25 : 1);
-  return Math.ceil((total - 1e-9) * 2) / 2;
-};
-
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
   useEffect(() => {
@@ -215,12 +205,7 @@ const statusBadge = (status: CarrierStatus) => {
   );
 };
 
-function ResultRow({ result, highlighted, customerPrice, includeVat }: {
-  result: PriceResult;
-  highlighted: boolean;
-  customerPrice: (price: number | null) => number | null;
-  includeVat: boolean;
-}) {
+function ResultRow({ result, highlighted }: { result: PriceResult; highlighted: boolean }) {
   return (
     <div style={{ ...cardStyle(highlighted), padding: 14, opacity: result.status === "no" ? 0.78 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
@@ -235,12 +220,7 @@ function ResultRow({ result, highlighted, customerPrice, includeVat }: {
             {statusBadge(result.status)}
           </div>
         </div>
-        <div style={{ minWidth: 125, textAlign: "right", whiteSpace: "nowrap" }}>
-          <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>Ulazno</div>
-          <div style={{ fontSize: 15, fontWeight: 800 }}>{money(result.price)}</div>
-          <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800, marginTop: 4, textTransform: "uppercase" }}>Kupcu {includeVat ? "· s PDV-om" : "· bez PDV-a"}</div>
-          <div style={{ color: "#b91c1c", fontSize: 23, fontWeight: 900 }}>{money(customerPrice(result.price))}</div>
-        </div>
+        <div style={{ fontSize: 24, fontWeight: 900, whiteSpace: "nowrap" }}>{money(result.price)}</div>
       </div>
 
       <div style={{ marginTop: 10, display: "grid", gap: 4, color: "#475569", lineHeight: 1.45 }}>
@@ -255,12 +235,7 @@ function ResultRow({ result, highlighted, customerPrice, includeVat }: {
   );
 }
 
-function ChoiceCard({ label, result, customerPrice, includeVat }: {
-  label: ServiceType;
-  result: PriceResult | null;
-  customerPrice: (price: number | null) => number | null;
-  includeVat: boolean;
-}) {
+function ChoiceCard({ label, result }: { label: ServiceType; result: PriceResult | null }) {
   const accents: Record<ServiceType, { border: string; background: string; color: string }> = {
     "MBE Economy": { border: "#16a34a", background: "#f0fdf4", color: "#166534" },
     "MBE Express": { border: "#dc2626", background: "#fef2f2", color: "#b91c1c" },
@@ -286,11 +261,7 @@ function ChoiceCard({ label, result, customerPrice, includeVat }: {
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             {statusBadge(result.status)}
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: "#64748b", fontSize: 11 }}>Ulazno: {money(result.price)}</div>
-              <div style={{ color: accent.color, fontSize: 12, fontWeight: 800 }}>Kupcu {includeVat ? "s PDV-om" : "bez PDV-a"}</div>
-              <strong style={{ color: accent.color, fontSize: 23 }}>{money(customerPrice(result.price))}</strong>
-            </div>
+            <span style={{ fontSize: 26, fontWeight: 900 }}>{money(result.price)}</span>
           </div>
           {result.warning ? <div style={{ marginTop: 8, color: "#9a3412", fontSize: 13, lineHeight: 1.4 }}>{result.warning}</div> : null}
         </>
@@ -322,15 +293,6 @@ export default function App() {
   const [additionalServices, setAdditionalServices] = useState<AdditionalServices>({ ...DEFAULT_ADDITIONAL_SERVICES });
   const [inTimeOptions, setInTimeOptions] = useState<InTimeOptions>({ ...DEFAULT_INTIME_OPTIONS });
   const [packages, setPackages] = useState<PackageItem[]>([{ ...DEFAULT_FIRST_PACKAGE }]);
-  const [customerMargin, setCustomerMargin] = useState("0");
-  const [customerMarginMode, setCustomerMarginMode] = useState<CustomerMarginMode>("percent");
-  const [customerPriceIncludesVat, setCustomerPriceIncludesVat] = useState(false);
-  const [matrixOpen, setMatrixOpen] = useState(false);
-  const [matrixWeightFrom, setMatrixWeightFrom] = useState("1");
-  const [matrixWeightTo, setMatrixWeightTo] = useState("30");
-  const [matrixEconomy, setMatrixEconomy] = useState(true);
-  const [matrixExpress, setMatrixExpress] = useState(true);
-  const [matrixLockers, setMatrixLockers] = useState(true);
 
   const numericPackages = useMemo<NumericPackageItem[]>(() => packages.map((item) => ({
     weight: parseNum(item.weight) ?? 0,
@@ -472,46 +434,6 @@ export default function App() {
   };
   const commonInputProps = { onFocus: (event: FocusEvent<HTMLInputElement>) => event.target.select() };
   const additionalPackages = packages.slice(1);
-  const numericCustomerMargin = parseNum(customerMargin) ?? 0;
-  const getCustomerPrice = (price: number | null) => customerPriceFor(price, numericCustomerMargin, customerMarginMode, customerPriceIncludesVat);
-  const matrixFrom = Math.max(1, Math.ceil(parseNum(matrixWeightFrom) ?? 1));
-  const matrixTo = Math.min(100, Math.floor(parseNum(matrixWeightTo) ?? 30));
-  const matrixHasServices = matrixEconomy || matrixExpress || (isDomestic && matrixLockers);
-  const matrixReady = (!isDomestic || postalCode.length === 5)
-    && (!isWorldwide || (parseNum(goodsValue) ?? 0) > 0)
-    && numericPackages.length > 0
-    && [numericPackages[0]?.length, numericPackages[0]?.width, numericPackages[0]?.height].every((value) => value !== undefined && value > 0);
-  const matrixRows = useMemo(() => {
-    if (!matrixOpen || !matrixReady || !matrixHasServices || matrixFrom > matrixTo) return [];
-    const firstPackage = numericPackages[0] ?? { weight: 1, length: 30, width: 20, height: 10 };
-    const rows = [];
-    for (let weight = matrixFrom; weight <= matrixTo; weight += 1) {
-      const prices = calculatePrices({
-        originPostalCode,
-        pricingDate: localPricingDate(),
-        destinationCountry,
-        postalCode,
-        destinationPlace,
-        recipientType,
-        packages: [{ ...firstPackage, weight }],
-        cod: false,
-        codAmount: 0,
-        codPaymentMethod: "cash",
-        goodsValue: parseNum(goodsValue) ?? 0,
-        additionalServices: DEFAULT_ADDITIONAL_SERVICES,
-        inTimeOptions: DEFAULT_INTIME_OPTIONS,
-      });
-      rows.push({ weight, prices });
-    }
-    return rows;
-  }, [matrixOpen, matrixReady, matrixHasServices, matrixFrom, matrixTo, numericPackages, originPostalCode, destinationCountry, postalCode, destinationPlace, recipientType, goodsValue, upsAreaDataLoaded, upsAreaDataError]);
-  const matrixPriceCell = (result: PriceResult | null) => result?.price !== null && result?.price !== undefined ? (
-    <div style={{ display: "grid", gap: 3 }}>
-      <strong style={{ fontSize: 12, lineHeight: 1.3 }}>{result.name}</strong>
-      <span style={{ color: "#64748b", fontSize: 11 }}>Ulazno: {money(result.price)}</span>
-      <strong style={{ color: "#b91c1c", fontSize: 13 }}>Kupcu: {money(getCustomerPrice(result.price))}</strong>
-    </div>
-  ) : <span style={{ color: "#94a3b8" }}>Nema cijene</span>;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", padding: isMobile ? 12 : 16, paddingBottom: isMobile ? 160 : 18, fontFamily: "Ubuntu, Arial, sans-serif" }}>
@@ -528,45 +450,6 @@ export default function App() {
             <button style={{ ...buttonStyle(), minHeight: 38, padding: "8px 12px" }} onClick={resetShipment}>Reset</button>
           </div>
         </header>
-
-        <section style={{ ...cardStyle(), padding: "12px 14px", border: "1px solid #fecaca" }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Cijena za kupca</div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(240px, 1fr) auto", gap: 12, alignItems: "end" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Moja marža</label>
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(90px, 1fr) minmax(145px, 1fr)", gap: 8 }}>
-                <input
-                  inputMode="decimal"
-                  type="text"
-                  value={customerMargin}
-                  onChange={(event) => setCustomerMargin(event.target.value)}
-                  placeholder="0"
-                  style={inputStyle()}
-                />
-                <select
-                  value={customerMarginMode}
-                  onChange={(event) => setCustomerMarginMode(event.target.value as CustomerMarginMode)}
-                  style={inputStyle()}
-                >
-                  <option value="percent">% na ulaznu cijenu</option>
-                  <option value="fixed">€ po pošiljci</option>
-                </select>
-              </div>
-            </div>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, fontWeight: 800, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={customerPriceIncludesVat}
-                onChange={(event) => setCustomerPriceIncludesVat(event.target.checked)}
-                style={{ width: 18, height: 18, accentColor: "#dc2626" }}
-              />
-              Uključi PDV 25%
-            </label>
-          </div>
-          <div style={{ marginTop: 8, color: "#64748b", fontSize: 12, lineHeight: 1.4 }}>
-            Marža u postotku računa se na ulaznu cijenu. Cijena kupcu zaokružuje se uvijek prema gore na sljedećih 0,50 €; ulazna cijena ostaje nepromijenjena.
-          </div>
-        </section>
 
         <div style={{ ...cardStyle(), padding: "12px 14px", background: "#fff" }}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 10, alignItems: "end" }}>
@@ -839,9 +722,9 @@ export default function App() {
           </section>
 
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
-            <ChoiceCard label="MBE Economy" result={results?.economyWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} />
-            <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} />
-            {isDomestic ? <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} /> : null}
+            <ChoiceCard label="MBE Economy" result={results?.economyWinner ?? null} />
+            <ChoiceCard label="MBE Express" result={results?.expressWinner ?? null} />
+            {isDomestic ? <ChoiceCard label="MBE Paketomati" result={results?.lockerWinner ?? null} /> : null}
           </div>
         </div>
 
@@ -871,73 +754,9 @@ export default function App() {
           ) : <div style={{ marginTop: 12, color: "#64748b" }}>Za više paketa klikni “Dodaj paket”.</div>}
         </details>
 
-        <ResultSection title="MBE Economy · usporedba kurira" results={results?.economy ?? null} winner={results?.economyWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} defaultOpen />
-        <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} />
-        {isDomestic ? <ResultSection title="Paketomati · dodatna mogućnost" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} customerPrice={getCustomerPrice} includeVat={customerPriceIncludesVat} /> : null}
-
-        <section style={cardStyle()}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontWeight: 900, fontSize: 17 }}>Matrica cijena po težinama</div>
-              <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>Odredište: {destinationLabel}{postalCode ? ` · ${postalCode}` : ""}</div>
-            </div>
-            <button style={buttonStyle(true)} onClick={() => setMatrixOpen((current) => !current)}>
-              {matrixOpen ? "Sakrij matricu" : "Prikaži matricu"}
-            </button>
-          </div>
-          {matrixOpen ? (
-            <>
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "150px 150px 1fr", gap: 10, alignItems: "end" }}>
-                <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Od (kg)</label>
-                  <input type="number" min="1" max="100" step="1" value={matrixWeightFrom} onChange={(event) => setMatrixWeightFrom(event.target.value)} style={inputStyle()} />
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Do (kg)</label>
-                  <input type="number" min="1" max="100" step="1" value={matrixWeightTo} onChange={(event) => setMatrixWeightTo(event.target.value)} style={inputStyle()} />
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", minHeight: 44 }}>
-                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixEconomy} onChange={(event) => setMatrixEconomy(event.target.checked)} /> Economy</label>
-                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixExpress} onChange={(event) => setMatrixExpress(event.target.checked)} /> Express</label>
-                  {isDomestic ? <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 800 }}><input type="checkbox" checked={matrixLockers} onChange={(event) => setMatrixLockers(event.target.checked)} /> Paketomati</label> : null}
-                </div>
-              </div>
-              <div style={{ marginTop: 8, color: "#64748b", fontSize: 12, lineHeight: 1.4 }}>
-                Računa se po 1 kg, za jedan paket dimenzija paketa 1. Koriste se uneseni poštanski brojevi; pouzeće i dodatne usluge nisu uključeni.
-              </div>
-              {matrixFrom > matrixTo ? (
-                <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Provjeri raspon težina.</div>
-              ) : !matrixHasServices ? (
-                <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>Odaberi barem jednu uslugu.</div>
-              ) : !matrixReady ? (
-                <div style={{ marginTop: 10, color: "#9a3412", fontWeight: 800 }}>Za matricu najprije unesi obavezne podatke o odredištu i dimenzijama paketa 1.</div>
-              ) : matrixRows.length ? (
-                <div style={{ marginTop: 12, overflowX: "auto" }}>
-                  <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: "#f8fafc", textAlign: "left" }}>
-                        <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>Težina</th>
-                        {matrixEconomy ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>MBE Economy</th> : null}
-                        {matrixExpress ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>MBE Express</th> : null}
-                        {isDomestic && matrixLockers ? <th style={{ padding: 10, borderBottom: "1px solid #cbd5e1" }}>Paketomati</th> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {matrixRows.map((row) => (
-                        <tr key={row.weight}>
-                          <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", fontWeight: 900, whiteSpace: "nowrap" }}>{row.weight} kg</td>
-                          {matrixEconomy ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.economyWinner)}</td> : null}
-                          {matrixExpress ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.expressWinner)}</td> : null}
-                          {isDomestic && matrixLockers ? <td style={{ padding: 10, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" }}>{matrixPriceCell(row.prices.lockerWinner)}</td> : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </section>
+        <ResultSection title="MBE Economy · usporedba kurira" results={results?.economy ?? null} winner={results?.economyWinner ?? null} defaultOpen />
+        <ResultSection title="MBE Express · brža opcija" results={results?.express ?? null} winner={results?.expressWinner ?? null} />
+        {isDomestic ? <ResultSection title="Paketomati · dodatna mogućnost" results={results?.lockers ?? null} winner={results?.lockerWinner ?? null} /> : null}
       </div>
 
       <div style={{ position: isMobile ? "fixed" : "sticky", left: 0, right: 0, bottom: 0, zIndex: 30, padding: isMobile ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : 0, background: isMobile ? "rgba(248,250,252,.96)" : "transparent", backdropFilter: isMobile ? "blur(10px)" : "none", borderTop: isMobile ? "1px solid #e5e7eb" : "none", marginTop: 14 }}>
@@ -949,7 +768,7 @@ export default function App() {
                 <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>{recommendation ? `${expressFallback ? "MBE Express opcija" : "MBE Economy preporuka"} · ${recommendation.name}` : "Pregled unesenih podataka"}</span>
               </span>
               <span style={{ color: recommendation ? (expressFallback ? "#b91c1c" : "#166534") : "#64748b", fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}>
-                <span>{recommendation ? money(getCustomerPrice(recommendation.price)) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
+                <span>{recommendation ? money(recommendation.price) : "—"}</span><span style={{ fontSize: 12 }}>▾</span>
               </span>
             </summary>
             {recommendation ? (
@@ -961,10 +780,7 @@ export default function App() {
                     <strong>{recommendation.name}</strong>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ color: "#64748b", fontSize: 11 }}>Ulazno: {money(recommendation.price)}</div>
-                  <strong style={{ color: expressFallback ? "#b91c1c" : "#166534", fontSize: 24 }}>{money(getCustomerPrice(recommendation.price))}</strong>
-                </div>
+                <strong style={{ color: expressFallback ? "#b91c1c" : "#166534", fontSize: 24 }}>{money(recommendation.price)}</strong>
               </div>
             ) : null}
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, color: "#475569" }}>
@@ -1031,15 +847,11 @@ function ResultSection({
   title,
   results,
   winner,
-  customerPrice,
-  includeVat,
   defaultOpen = false,
 }: {
   title: string;
   results: PriceResult[] | null;
   winner: PriceResult | null;
-  customerPrice: (price: number | null) => number | null;
-  includeVat: boolean;
   defaultOpen?: boolean;
 }) {
   return (
@@ -1050,7 +862,7 @@ function ResultSection({
       </summary>
       {results ? (
         <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
-          {results.map((result) => <ResultRow key={result.id} result={result} highlighted={result.id === winner?.id} customerPrice={customerPrice} includeVat={includeVat} />)}
+          {results.map((result) => <ResultRow key={result.id} result={result} highlighted={result.id === winner?.id} />)}
         </div>
       ) : <div style={{ marginTop: 12, color: "#64748b" }}>Popuni sve obavezne podatke o odredištu i paketima.</div>}
     </details>
